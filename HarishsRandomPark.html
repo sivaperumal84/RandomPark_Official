@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Interactive Book Store</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      margin: 0;
+      background: #f5f7fa;
+      color: #333;
+    }
+    header {
+      background: #232f3e;
+      color: white;
+      padding: 1rem 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 15px;
+      flex-wrap: wrap;
+    }
+    header h1 {
+      margin: 0;
+      font-weight: 700;
+      font-size: 1.8rem;
+      flex-grow: 1;
+      min-width: 200px;
+    }
+    #searchBar {
+      padding: 6px 8px;
+      font-size: 1rem;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+      min-width: 250px;
+      flex-grow: 2;
+      max-width: 500px;
+    }
+    main {
+      max-width: 1200px;
+      margin: 2rem auto;
+      padding: 0 1rem;
+    }
+    .modal-backdrop {
+      background-color: rgba(0,0,0,0.5);
+    }
+    .preview-box {
+      background: white;
+      max-width: 900px;
+      margin: 2rem auto;
+      border-radius: 10px;
+      box-shadow: 0 6px 20px rgba(0,0,0,0.1);
+      padding: 1.5rem;
+      position: relative;
+    }
+    .preview-content {
+      white-space: pre-wrap;
+      line-height: 1.5;
+      font-size: 1rem;
+      max-height: 300px;
+      overflow-y: auto;
+      border: 1px solid #ddd;
+      padding: 12px;
+      border-radius: 6px;
+      background: #fafafa;
+      margin-top: 1rem;
+    }
+    .close-preview-btn {
+      position: absolute;
+      top: 1rem;
+      right: 1rem;
+      background: #d9534f;
+      border: none;
+      color: white;
+      font-weight: 600;
+      font-size: 1.2rem;
+      padding: 4px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    .cart-box,
+    .feedback-section {
+      background: white;
+      max-width: 800px;
+      margin: 3rem auto;
+      padding: 1.5rem 2rem;
+      border-radius: 10px;
+      box-shadow: 0 6px 20px rgba(0,0,0,0.1);
+    }
+    ul.cart-list {
+      list-style: none;
+      margin: 1rem 0 2rem 0;
+      padding: 0;
+    }
+    ul.cart-list li {
+      border-bottom: 1px solid #ddd;
+      padding: 0.9rem 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    #checkout-btn {
+      background-color: #007185;
+      color: white;
+      font-size: 1.1rem;
+      font-weight: 700;
+      padding: 12px 20px;
+      border-radius: 6px;
+      width: 100%;
+      cursor: pointer;
+      transition: background-color 0.3s ease;
+    }
+    #checkout-btn:disabled {
+      background-color: #bbb;
+      cursor: not-allowed;
+    }
+  </style>
+</head>
+<body>
+
+<!-- Name Entry Screen -->
+<div id="nameScreen" class="fixed inset-0 bg-gradient-to-br from-blue-600 via-purple-600 to-indigo-600 flex items-center justify-center p-4 z-50">
+  <div class="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full text-center">
+    <h1 class="text-3xl font-bold text-indigo-900 mb-2">Welcome to Our Bookstore!</h1>
+    <p class="text-gray-600 mb-4">Please enter your name to continue</p>
+    <form id="nameForm">
+      <input
+        type="text"
+        id="nameInput"
+        aria-label="Enter your name"
+        placeholder="Enter your name"
+        class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg text-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+        required
+        pattern="[a-zA-Z\s]{2,}"
+        title="Please enter at least 2 letters, letters and spaces only"
+      />
+      <p id="nameError" class="text-red-500 text-sm mt-2 hidden">Please enter a valid name (at least 2 letters, letters and spaces only)</p>
+      <button
+        type="submit"
+        class="w-full mt-4 bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white font-bold py-3 px-6 rounded-lg transition-all duration-200 transform hover:scale-105"
+      >
+        Enter Bookstore
+      </button>
+    </form>
+  </div>
+</div>
+
+<!-- Main Content -->
+<div id="mainContent" class="hidden">
+  <header>
+    <h1>Interactive Book Store</h1>
+    <input type="search" id="searchBar" aria-label="Search books by title or author" placeholder="Search by title or author" />
+    <div aria-live="polite" aria-atomic="true" aria-relevant="text" class="ticket-info font-semibold" style="white-space: nowrap;">
+      Tickets: <span id="tickets">20</span> T
+    </div>
+    <div id="profileDisplay" class="profile-info cursor-pointer font-semibold"></div>
+  </header>
+
+  <main>
+    <section id="genreFilters" aria-label="Genre Filters" class="flex flex-wrap gap-2 mb-4"></section>
+
+    <section aria-label="Available Books">
+      <div id="book-list" class="grid gap-6" style="grid-template-columns: repeat(auto-fit,minmax(280px,1fr));"></div>
+    </section>
+
+    <section id="preview-section" class="hidden" aria-modal="true" role="dialog" aria-labelledby="preview-title" tabindex="-1">
+      <div class="preview-box">
+        <h2 id="preview-title"></h2>
+        <div id="preview-text" class="preview-content" tabindex="0"></div>
+        <button id="close-preview-btn" class="close-preview-btn" aria-label="Close Preview">×</button>
+      </div>
+    </section>
+
+    <section aria-label="Shopping Cart" class="cart-box">
+      <h2>Shopping Cart</h2>
+      <ul id="cart-list" aria-live="polite" class="cart-list"></ul>
+      <button id="checkout-btn" disabled>Pay with Tickets</button>
+    </section>
+
+    <section aria-label="User Feedback" class="feedback-section">
+      <h2>Send Us Your Feedback</h2>
+      <form id="feedbackForm">
+        <label for="feedbackText" class="block mb-1 font-semibold">Your feedback:</label>
+        <textarea id="feedbackText" rows="4" placeholder="Write your feedback here..." class="w-full p-2 border border-gray-300 rounded"></textarea>
+        <button type="submit" class="mt-3 bg-blue-700 text-white py-2 px-4 rounded hover:bg-blue-800 cursor-pointer">Submit Feedback</button>
+      </form>
+      <p id="feedbackMessage" class="mt-3 font-semibold text-green-600 hidden">Thank you for your feedback!</p>
+    </section>
+  </main>
+</div>
+
+<!-- Profile Modal -->
+<div id="profileModal" class="modal-backdrop hidden fixed inset-0 flex items-center justify-center z-50" role="dialog" aria-modal="true" aria-labelledby="profileModalTitle">
+  <div class="bg-white p-6 rounded-lg max-w-sm w-full max-h-[80vh] overflow-auto relative">
+    <h2 id="profileModalTitle" class="text-xl font-bold mb-4">Edit Profile</h2>
+    <form id="profileForm">
+      <label for="profileName" class="block font-semibold mb-1">Name:</label>
+      <input type="text" id="profileName" class="w-full mb-4 p-2 border border-gray-300 rounded" />
+      <label for="profileFunFact" class="block font-semibold mb-1">Fun Fact/About You:</label>
+      <textarea id="profileFunFact" rows="4" class="w-full mb-4 p-2 border border-gray-300 rounded" placeholder="Tell us something fun about you!"></textarea>
+      <div class="flex justify-end gap-2">
+        <button type="submit" class="bg-blue-700 text-white py-2 px-4 rounded hover:bg-blue-800">Save</button>
+        <button type="button" id="profileCloseBtn" class="bg-gray-300 py-2 px-4 rounded hover:bg-gray-400">Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+  // Constants for localStorage keys
+  const PROFILE_KEY = 'bookstoreUserProfile';
+  const CART_KEY = 'bookstoreUserCart';
+  const TICKET_KEY = 'bookstoreUserTickets';
+
+  // Elements
+  const nameScreen = document.getElementById('nameScreen');
+  const mainContent = document.getElementById('mainContent');
+  const nameForm = document.getElementById('nameForm');
+  const nameInput = document.getElementById('nameInput');
+  const nameError = document.getElementById('nameError');
+  const ticketsEl = document.getElementById('tickets');
+  const profileDisplay = document.getElementById('profileDisplay');
+  const profileModal = document.getElementById('profileModal');
+  const profileForm = document.getElementById('profileForm');
+  const profileNameInput = document.getElementById('profileName');
+  const profileFunFactInput = document.getElementById('profileFunFact');
+  const profileCloseBtn = document.getElementById('profileCloseBtn');
+  const searchBar = document.getElementById('searchBar');
+  const genreFiltersEl = document.getElementById('genreFilters');
+  const bookListEl = document.getElementById('book-list');
+  const previewSection = document.getElementById('preview-section');
+  const previewTitleEl = document.getElementById('preview-title');
+  const previewTextEl = document.getElementById('preview-text');
+  const closePreviewBtn = document.getElementById('close-preview-btn');
+  const cartListEl = document.getElementById('cart-list');
+  const checkoutBtn = document.getElementById('checkout-btn');
+  const feedbackForm = document.getElementById('feedbackForm');
+  const feedbackText = document.getElementById('feedbackText');
+  const feedbackMessage = document.getElementById('feedbackMessage');
+
+  // Sample book data - add your own data here
+  const baseBooks = [
+    {
+      id: 1,
+      title: "The Adventures of Sherlock Holmes",
+      author: "Arthur Conan Doyle",
+      genres: ["Mystery", "Classic"],
+      prices: { ebook: 5, physical: 10 },
+      preview: "A collection of twelve short stories featuring Sherlock Holmes.",
+      authorBio: "British writer and physician, famous for creating Sherlock Holmes.",
+      series: null,
+      publisher: "George Newnes",
+      isbn: "978-0451524935",
+      releaseDate: "1892-10-14",
+      bestSeller: true,
+      awards: []
+    },
+    {
+      id: 2,
+      title: "Pride and Prejudice",
+      author: "Jane Austen",
+      genres: ["Romance", "Classic"],
+      prices: { ebook: 4, physical: 9 },
+      preview: "A romantic novel of manners in early 19th century England.",
+      authorBio: "Renowned English novelist known for her six major novels.",
+      series: null,
+      publisher: "T. Egerton",
+      isbn: "978-1503290563",
+      releaseDate: "1813-01-28",
+      bestSeller: true,
+      awards: []
+    },
+    // Add more book objects here as needed
+  ];
+
+  // State variables
+  let userProfile = null;
+  let currentCart = [];
+  let currentUserTickets = 20;
+  let activeGenreFilter = 'All';
+
+  // Utilities
+  function saveData() {
+    localStorage.setItem(PROFILE_KEY, JSON.stringify(userProfile));
+    localStorage.setItem(CART_KEY, JSON.stringify(currentCart));
+    localStorage.setItem(TICKET_KEY, String(currentUserTickets));
+  }
+  function loadData() {
+    userProfile = JSON.parse(localStorage.getItem(PROFILE_KEY) || 'null');
+    currentCart = JSON.parse(localStorage.getItem(CART_KEY) || '[]');
+    currentUserTickets = Number(localStorage.getItem(TICKET_KEY));
+    if(isNaN(currentUserTickets) || currentUserTickets < 0) currentUserTickets = 20;
+  }
+  function updateTicketsDisplay() {
+    ticketsEl.textContent = currentUserTickets;
+  }
+  function updateHeaderProfileDisplay() {
+    if(userProfile){
+      const firstChar = userProfile.name.trim().charAt(0).toUpperCase();
+      const emojis = ['📚','✨','🚀','🌟','🎉','🔥','🎈','📖','🦄','🌈'];
+      const emoji = emojis[firstChar.charCodeAt(0) % emojis.length];
+      profileDisplay.textContent = `${emoji} ${userProfile.name} (edit)`;
+      profileDisplay.title = "Click to edit profile";
+    }
+  }
+  function capitalize(str) {
+    return str.charAt(0).toUpperCase() + str.slice(1);
+  }
+  function formatPrice(tickets) {
+    return `${tickets}T`;
+  }
+  function getGenres() {
+    const genresSet = new Set();
+    baseBooks.forEach(book => book.genres.forEach(genre => genresSet.add(genre)));
+    return ['All', ...Array.from(genresSet).sort()];
+  }
+
+  // Render functions
+  function renderGenreFilters() {
+    genreFiltersEl.innerHTML = '';
+    getGenres().forEach(genre => {
+      const btn = document.createElement('button');
+      btn.textContent = genre;
+      btn.className = genre === activeGenreFilter ? 'bg-blue-700 text-white px-3 py-1 rounded' : 'bg-gray-300 text-gray-700 px-3 py-1 rounded hover:bg-gray-400';
+      btn.setAttribute('aria-pressed', genre === activeGenreFilter);
+      btn.addEventListener('click', () => {
+        activeGenreFilter = genre;
+        renderGenreFilters();
+        renderBooks();
+      });
+      genreFiltersEl.appendChild(btn);
+    });
+  }
+
+  function filterBooks() {
+    const query = searchBar.value.trim().toLowerCase();
+    return baseBooks.filter(book => {
+      const matchesGenre = activeGenreFilter === 'All' || book.genres.includes(activeGenreFilter);
+      const matchesSearch = 
+        book.title.toLowerCase().includes(query) ||
+        book.author.toLowerCase().includes(query) ||
+        (book.preview && book.preview.toLowerCase().includes(query));
+      return matchesGenre && matchesSearch;
+    });
+  }
+
+  function renderBooks() {
+    bookListEl.innerHTML = '';
+    const booksToShow = filterBooks();
+    if(booksToShow.length === 0) {
+      bookListEl.innerHTML = '<p class="text-center text-gray-500">No books found matching your criteria.</p>';
+      return;
+    }
+    booksToShow.forEach(book => {
+      const card = document.createElement('article');
+      card.className = 'bg-white p-4 rounded-lg shadow hover:shadow-md';
+
+      const badges = [];
+      if(book.bestSeller) badges.push(`<span class="text-yellow-600 font-semibold mr-2">Best Seller</span>`);
+      const badgeHtml = badges.join('');
+
+      card.innerHTML = `
+        <h3 class="text-lg font-bold">${book.title} ${badgeHtml}</h3>
+        <p class="italic text-gray-600 cursor-pointer" tabindex="0" role="button" aria-label="Show author bio for ${book.author}">${book.author}</p>
+        <p><strong>Ebook:</strong> ${formatPrice(book.prices.ebook)} &nbsp;|&nbsp; <strong>Physical:</strong> ${formatPrice(book.prices.physical)}</p>
+        <button class="preview-btn bg-blue-600 text-white px-3 py-1 rounded mt-2 hover:bg-blue-700" aria-label="Preview ${book.title}">Preview</button>
+        <div class="mt-2">
+          <button class="add-btn mr-2 bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700" data-format="ebook" aria-label="Add ebook of ${book.title}">Add Ebook</button>
+          <button class="add-btn bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700" data-format="physical" aria-label="Add physical copy of ${book.title}">Add Physical</button>
+        </div>
+      `;
+
+      // Preview button event
+      card.querySelector('.preview-btn').addEventListener('click', () => {
+        previewTitleEl.textContent = `${book.title} - Preview`;
+        previewTextEl.textContent = book.preview || 'No preview available.';
+        previewSection.classList.remove('hidden');
+        previewSection.focus();
+      });
+
+      // Add to cart buttons event
+      card.querySelectorAll('.add-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          addToCart(book.id, btn.dataset.format);
+        });
+      });
+
+      bookListEl.appendChild(card);
+    });
+  }
+
+  // Cart functionality
+  function addToCart(bookId, format) {
+    const book = baseBooks.find(b => b.id === bookId);
+    if(!book) return;
+    const price = book.prices[format];
+    if(price > currentUserTickets) {
+      alert("Not enough tickets!");
+      return;
+    }
+    const cartItem = currentCart.find(i => i.bookId === bookId && i.format === format);
+    if(cartItem) {
+      cartItem.quantity++;
+    } else {
+      currentCart.push({ bookId, format, quantity:1 });
+    }
+    updateTickets();
+    saveData();
+    renderCart();
+  }
+
+  function removeFromCart(bookId, format) {
+    const index = currentCart.findIndex(i => i.bookId === bookId && i.format === format);
+    if(index !== -1) {
+      currentCart.splice(index,1);
+      updateTickets();
+      saveData();
+      renderCart();
+    }
+  }
+
+  function renderCart() {
+    cartListEl.innerHTML = '';
+    if(currentCart.length === 0) {
+      cartListEl.innerHTML = '<p class="text-center text-gray-600">Your cart is empty.</p>';
+      updateTickets();
+      return;
+    }
+    currentCart.forEach(item => {
+      const book = baseBooks.find(b => b.id === item.bookId);
+      if(!book) return;
+      const price = book.prices[item.format];
+      const total = price * item.quantity;
+      const li = document.createElement('li');
+      li.innerHTML = `
+        <span>${book.title} - ${capitalize(item.format)} x ${item.quantity} = ${formatPrice(total)}</span>
+        <button class="text-red-600 hover:text-red-800">Remove</button>
+      `;
+      li.querySelector('button').addEventListener('click', () => removeFromCart(item.bookId, item.format));
+      cartListEl.appendChild(li);
+    });
+  }
+
+  function updateTickets() {
+    const spent = currentCart.reduce((sum, item) => {
+      const b = baseBooks.find(bk => bk.id === item.bookId);
+      return sum + (b ? b.prices[item.format] * item.quantity : 0);
+    }, 0);
+    currentUserTickets = Math.max(0, Number(localStorage.getItem(TICKET_KEY)) - spent);
+    updateTicketsDisplay();
+
+    checkoutBtn.disabled = currentCart.length === 0 || currentUserTickets < 0;
+  }
+
+  checkoutBtn.addEventListener('click', () => {
+    if(currentCart.length === 0){
+      alert("Your cart is empty!");
+      return;
+    }
+    if(currentUserTickets < 0){
+      alert("Not enough tickets!");
+      return;
+    }
+    // Process purchase
+    localStorage.setItem(TICKET_KEY, String(currentUserTickets));
+    alert(`Purchase successful! Tickets left: ${currentUserTickets}T`);
+    currentCart = [];
+    saveData();
+    renderCart();
+    updateTickets();
+  });
+
+  // Search and Filter
+  searchBar.addEventListener('input', renderBooks);
+
+  // Preview close
+  closePreviewBtn.addEventListener('click', () => previewSection.classList.add('hidden'));
+  previewSection.addEventListener('click', (e) => {
+    if(e.target === previewSection) previewSection.classList.add('hidden');
+  });
+
+  // Profile modal
+  profileDisplay.addEventListener('click', () => {
+    if(!userProfile) return;
+    profileNameInput.value = userProfile.name;
+    profileFunFactInput.value = userProfile.funFact || '';
+    profileModal.classList.remove('hidden');
+    profileNameInput.focus();
+  });
+  profileCloseBtn.addEventListener('click', () => profileModal.classList.add('hidden'));
+  profileForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const newName = profileNameInput.value.trim();
+    if(newName.length < 2) {
+      alert("Please enter a valid name (at least 2 letters).");
+      return;
+    }
+    userProfile.name = newName;
+    userProfile.funFact = profileFunFactInput.value.trim();
+    saveData();
+    updateHeaderProfileDisplay();
+    profileModal.classList.add('hidden');
+  });
+
+  // Handle initial name form submit
+  nameForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const trimmedName = nameInput.value.trim();
+    const nameRegex = /^[a-zA-Z\s]{2,}$/;
+    if(trimmedName && nameRegex.test(trimmedName)){
+      userProfile = { name: trimmedName, funFact: "Ready for new adventures!" };
+      currentUserTickets = 20;
+      currentCart = [];
+      saveData();
+      nameScreen.style.display = 'none';
+      mainContent.classList.remove('hidden');
+      updateHeaderProfileDisplay();
+      renderGenreFilters();
+      renderBooks();
+      renderCart();
+      updateTickets();
+    } else {
+      nameError.classList.remove('hidden');
+      nameInput.classList.add('border-red-500');
+    }
+  });
+
+  nameInput.addEventListener('input', () => {
+    nameError.classList.add('hidden');
+    nameInput.classList.remove('border-red-500');
+  });
+
+  // Profile edit by prompt alternative
+  // profileDisplay.addEventListener('click', () => {
+  //   if(!userProfile) return;
+  //   const newName = prompt("Edit your name:", userProfile.name);
+  //   if(newName && newName.trim().length >= 2) {
+  //     userProfile.name = newName.trim();
+  //     saveData();
+  //     updateHeaderProfileDisplay();
+  //   }
+  // });
+
+  // Feedback system
+  feedbackForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const feedback = feedbackText.value.trim();
+    if(feedback.length === 0) {
+      alert('Please enter your feedback before submitting.');
+      return;
+    }
+    // Send to server or local storage as needed
+    feedbackText.value = '';
+    feedbackMessage.classList.remove('hidden');
+    setTimeout(() => feedbackMessage.classList.add('hidden'), 4000);
+  });
+
+  // Initialization on page load
+  window.addEventListener('load', () => {
+    loadData();
+    if(userProfile && userProfile.name) {
+      nameScreen.style.display = 'none';
+      mainContent.classList.remove('hidden');
+      updateHeaderProfileDisplay();
+      renderGenreFilters();
+      renderBooks();
+      renderCart();
+      updateTickets();
+    }
+  });
+</script>
+</body>
+</html>
