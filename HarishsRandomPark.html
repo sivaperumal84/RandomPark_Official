@@ -10,19 +10,16 @@
             padding: 0;
             box-sizing: border-box;
         }
-
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
             padding: 20px;
         }
-
         .container {
             max-width: 1400px;
             margin: 0 auto;
         }
-
         header {
             background: rgba(255, 255, 255, 0.95);
             padding: 25px;
@@ -35,7 +32,6 @@
             flex-wrap: wrap;
             gap: 15px;
         }
-
         .logo {
             font-size: 32px;
             font-weight: bold;
@@ -44,20 +40,17 @@
             -webkit-text-fill-color: transparent;
             background-clip: text;
         }
-
         .header-right {
             display: flex;
             gap: 15px;
             align-items: center;
             flex-wrap: wrap;
         }
-
         .stats-panel {
             display: flex;
             gap: 10px;
             flex-wrap: wrap;
         }
-
         .stat-box {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             padding: 10px 15px;
@@ -69,7 +62,6 @@
             align-items: center;
             gap: 5px;
         }
-
         .ticket-counter {
             display: flex;
             align-items: center;
@@ -84,12 +76,10 @@
             cursor: pointer;
             transition: all 0.3s;
         }
-
         .ticket-counter:hover {
             transform: translateY(-2px);
             box-shadow: 0 6px 20px rgba(245, 87, 108, 0.6);
         }
-
         .customize-btn {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
@@ -101,12 +91,10 @@
             transition: all 0.3s;
             box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
         }
-
         .customize-btn:hover {
             transform: translateY(-2px);
             box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
         }
-
         .dashboard {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
@@ -114,7 +102,6 @@
             margin-bottom: 30px;
             display: none;
         }
-
         .dashboard-card {
             background: white;
             padding: 20px;
@@ -122,19 +109,16 @@
             box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
             text-align: center;
         }
-
         .dashboard-card h3 {
             color: #667eea;
             margin-bottom: 10px;
             font-size: 16px;
         }
-
         .dashboard-value {
             font-size: 32px;
             font-weight: bold;
             color: #333;
         }
-
         .progress-bar {
             width: 100%;
             height: 10px;
@@ -143,13 +127,11 @@
             overflow: hidden;
             margin-top: 10px;
         }
-
         .progress-fill {
             height: 100%;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             transition: width 0.5s ease;
         }
-
         .banner {
             background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
             padding: 20px;
@@ -160,12 +142,10 @@
             box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
             animation: pulse 2s infinite;
         }
-
         @keyframes pulse {
             0%, 100% { transform: scale(1); }
             50% { transform: scale(1.02); }
         }
-
         .filters-section {
             background: white;
             padding: 20px;
@@ -173,14 +153,12 @@
             margin-bottom: 30px;
             box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
         }
-
         .filters {
             display: flex;
             gap: 15px;
             flex-wrap: wrap;
             align-items: center;
         }
-
         .filter-btn {
             padding: 10px 20px;
             border: 2px solid #667eea;
@@ -191,12 +169,10 @@
             cursor: pointer;
             transition: all 0.3s;
         }
-
         .filter-btn.active {
             background: #667eea;
             color: white;
         }
-
         .search-box {
             padding: 10px 15px;
             border: 2px solid #ddd;
@@ -205,14 +181,12 @@
             flex: 1;
             min-width: 200px;
         }
-
         .books-grid {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
             gap: 25px;
             margin-bottom: 30px;
         }
-
         .book-card {
             background: white;
             border-radius: 15px;
@@ -222,12 +196,10 @@
             cursor: pointer;
             position: relative;
         }
-
         .book-card:hover {
             transform: translateY(-10px);
             box-shadow: 0 12px 48px rgba(0, 0, 0, 0.2);
         }
-
         .book-card.discounted::before {
             content: '🔥 HOT DEAL';
             position: absolute;
@@ -240,13 +212,11 @@
             font-size: 11px;
             font-weight: bold;
         }
-
         .book-rating {
             display: flex;
             gap: 5px;
             margin-bottom: 10px;
         }
-
         .book-title {
             font-size: 20px;
             font-weight: bold;
@@ -254,7 +224,6 @@
             margin-bottom: 15px;
             line-height: 1.4;
         }
-
         .book-meta {
             display: flex;
             gap: 10px;
@@ -262,13 +231,11 @@
             font-size: 12px;
             color: #666;
         }
-
         .book-prices {
             display: flex;
             gap: 15px;
             margin-bottom: 15px;
         }
-
         .price-option {
             flex: 1;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -278,22 +245,18 @@
             text-align: center;
             font-weight: bold;
         }
-
         .price-label {
             font-size: 12px;
             opacity: 0.9;
             margin-bottom: 5px;
         }
-
         .price-value {
             font-size: 18px;
         }
-
         .buy-buttons {
             display: flex;
             gap: 10px;
         }
-
         .buy-btn {
             flex: 1;
             padding: 12px;
@@ -304,28 +267,23 @@
             transition: all 0.3s;
             font-size: 14px;
         }
-
         .buy-ebook {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
         }
-
         .buy-physical {
             background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
             color: white;
         }
-
         .buy-btn:hover {
             transform: scale(1.05);
             box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
         }
-
         .buy-btn:disabled {
             opacity: 0.5;
             cursor: not-allowed;
             transform: none;
         }
-
         .preview-btn {
             width: 100%;
             padding: 10px;
@@ -338,12 +296,10 @@
             cursor: pointer;
             transition: all 0.3s;
         }
-
         .preview-btn:hover {
             background: #667eea;
             color: white;
         }
-
         .modal {
             display: none;
             position: fixed;
@@ -355,7 +311,6 @@
             z-index: 1000;
             overflow-y: auto;
         }
-
         .modal-content {
             background: white;
             max-width: 700px;
@@ -364,7 +319,6 @@
             border-radius: 15px;
             position: relative;
         }
-
         .close-btn {
             position: absolute;
             top: 15px;
@@ -373,36 +327,30 @@
             cursor: pointer;
             color: #666;
         }
-
         .close-btn:hover {
             color: #000;
         }
-
         .preview-text {
             line-height: 1.8;
             color: #333;
             white-space: pre-wrap;
         }
-
         .cart-section {
             display: grid;
             grid-template-columns: 2fr 1fr;
             gap: 20px;
             margin-bottom: 30px;
         }
-
         .cart {
             background: rgba(255, 255, 255, 0.95);
             padding: 25px;
             border-radius: 15px;
             box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
         }
-
         .cart h3 {
             color: #667eea;
             margin-bottom: 15px;
         }
-
         .cart-item {
             display: flex;
             justify-content: space-between;
@@ -411,21 +359,18 @@
             margin-bottom: 10px;
             border-radius: 8px;
         }
-
         .cart-summary {
             background: white;
             padding: 25px;
             border-radius: 15px;
             box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
         }
-
         .summary-row {
             display: flex;
             justify-content: space-between;
             padding: 10px 0;
             border-bottom: 1px solid #eee;
         }
-
         .checkout-btn {
             width: 100%;
             padding: 15px;
@@ -439,12 +384,10 @@
             margin-top: 15px;
             transition: all 0.3s;
         }
-
         .checkout-btn:hover {
             transform: translateY(-2px);
             box-shadow: 0 6px 20px rgba(67, 233, 123, 0.4);
         }
-
         .notification {
             position: fixed;
             top: 20px;
@@ -458,7 +401,6 @@
             display: none;
             animation: slideIn 0.3s;
         }
-
         @keyframes slideIn {
             from {
                 transform: translateX(400px);
@@ -469,7 +411,6 @@
                 opacity: 1;
             }
         }
-
         .badge {
             background: #f5576c;
             color: white;
@@ -479,7 +420,6 @@
             font-weight: bold;
             margin-left: 8px;
         }
-
         .welcome-screen {
             position: fixed;
             top: 0;
@@ -492,7 +432,6 @@
             align-items: center;
             justify-content: center;
         }
-
         .welcome-box {
             background: white;
             padding: 50px;
@@ -502,13 +441,11 @@
             width: 90%;
             text-align: center;
         }
-
         .welcome-box h1 {
             color: #667eea;
             margin-bottom: 30px;
             font-size: 32px;
         }
-
         .welcome-box input {
             width: 100%;
             padding: 15px;
@@ -518,12 +455,10 @@
             font-size: 16px;
             transition: border 0.3s;
         }
-
         .welcome-box input:focus {
             outline: none;
             border-color: #667eea;
         }
-
         .start-btn {
             width: 100%;
             padding: 15px;
@@ -536,34 +471,28 @@
             cursor: pointer;
             transition: transform 0.3s;
         }
-
         .start-btn:hover {
             transform: scale(1.05);
         }
-
         .start-btn:disabled {
             opacity: 0.5;
             cursor: not-allowed;
             transform: none;
         }
-
         .welcome-icon {
             font-size: 64px;
             margin-bottom: 20px;
         }
-
         .customize-section {
             margin-top: 25px;
             padding-top: 25px;
             border-top: 2px solid #eee;
         }
-
         .customize-section h3 {
             color: #667eea;
             margin-bottom: 15px;
             font-size: 18px;
         }
-
         .customize-modal {
             display: none;
             position: fixed;
@@ -575,7 +504,6 @@
             z-index: 3000;
             overflow-y: auto;
         }
-
         .customize-modal-content {
             background: white;
             max-width: 600px;
@@ -586,20 +514,17 @@
             max-height: 90vh;
             overflow-y: auto;
         }
-
         .customize-modal-content h2 {
             color: #667eea;
             margin-bottom: 30px;
             text-align: center;
         }
-
         .color-options {
             display: grid;
             grid-template-columns: repeat(4, 1fr);
             gap: 10px;
             margin-bottom: 15px;
         }
-
         .color-btn {
             width: 100%;
             height: 50px;
@@ -608,23 +533,19 @@
             cursor: pointer;
             transition: all 0.3s;
         }
-
         .color-btn:hover {
             transform: scale(1.1);
         }
-
         .color-btn.selected {
             border-color: #333;
             box-shadow: 0 0 0 2px white, 0 0 0 4px #333;
         }
-
         .avatar-options {
             display: flex;
             justify-content: center;
             gap: 10px;
             flex-wrap: wrap;
         }
-
         .avatar-btn {
             font-size: 35px;
             padding: 8px;
@@ -634,22 +555,18 @@
             transition: all 0.3s;
             background: #f8f9fa;
         }
-
         .avatar-btn:hover {
             transform: scale(1.2);
         }
-
         .avatar-btn.selected {
             border-color: #667eea;
             background: #e8eaf6;
         }
-
         .avatar-btn.locked {
             opacity: 0.3;
             cursor: not-allowed;
             position: relative;
         }
-
         .avatar-btn.locked::after {
             content: '🔒';
             position: absolute;
@@ -657,7 +574,6 @@
             right: -5px;
             font-size: 16px;
         }
-
         .unlock-badge {
             display: inline-block;
             background: linear-gradient(135deg, #ffd700 0%, #ffed4e 100%);
@@ -668,29 +584,24 @@
             font-weight: bold;
             margin-left: 5px;
         }
-
         .tier-section {
             margin-bottom: 20px;
             padding: 15px;
             background: #f8f9fa;
             border-radius: 10px;
         }
-
         .tier-title {
             font-size: 13px;
             color: #666;
             margin-bottom: 10px;
             font-weight: bold;
         }
-
         .tier-unlocked {
             color: #43e97b;
         }
-
         .tier-locked {
             color: #999;
         }
-
         .profile-modal {
             display: none;
             position: fixed;
@@ -702,7 +613,6 @@
             z-index: 3000;
             overflow-y: auto;
         }
-
         .profile-modal-content {
             background: white;
             max-width: 800px;
@@ -711,26 +621,22 @@
             border-radius: 20px;
             position: relative;
         }
-
         .profile-header {
             text-align: center;
             margin-bottom: 30px;
             padding-bottom: 20px;
             border-bottom: 2px solid #eee;
         }
-
         .profile-avatar {
             font-size: 80px;
             margin-bottom: 15px;
         }
-
         .profile-name {
             font-size: 28px;
             font-weight: bold;
             color: #333;
             margin-bottom: 10px;
         }
-
         .profile-level {
             display: inline-block;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -740,42 +646,35 @@
             font-weight: bold;
             font-size: 16px;
         }
-
         .profile-stats-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
             gap: 20px;
             margin-bottom: 30px;
         }
-
         .profile-stat-card {
             background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
             padding: 20px;
             border-radius: 15px;
             text-align: center;
         }
-
         .profile-stat-icon {
             font-size: 40px;
             margin-bottom: 10px;
         }
-
         .profile-stat-value {
             font-size: 32px;
             font-weight: bold;
             color: #333;
             margin-bottom: 5px;
         }
-
         .profile-stat-label {
             font-size: 14px;
             color: #666;
         }
-
         .profile-section {
             margin-bottom: 30px;
         }
-
         .profile-section h3 {
             color: #667eea;
             margin-bottom: 20px;
@@ -784,13 +683,11 @@
             align-items: center;
             gap: 10px;
         }
-
         .profile-achievements {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
             gap: 15px;
         }
-
         .profile-achievement {
             text-align: center;
             padding: 15px;
@@ -798,37 +695,30 @@
             border-radius: 10px;
             transition: all 0.3s;
         }
-
         .profile-achievement.unlocked {
             background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
             color: white;
             transform: scale(1.05);
         }
-
         .profile-achievement.locked {
             opacity: 0.4;
         }
-
         .profile-achievement-icon {
             font-size: 35px;
             margin-bottom: 8px;
         }
-
         .profile-achievement-name {
             font-size: 11px;
             font-weight: bold;
         }
-
         .profile-progress-section {
             background: #f8f9fa;
             padding: 20px;
             border-radius: 15px;
         }
-
         .profile-progress-item {
             margin-bottom: 15px;
         }
-
         .profile-progress-label {
             display: flex;
             justify-content: space-between;
@@ -837,7 +727,6 @@
             font-weight: bold;
             color: #333;
         }
-
         .profile-progress-bar {
             width: 100%;
             height: 12px;
@@ -845,13 +734,11 @@
             border-radius: 6px;
             overflow: hidden;
         }
-
         .profile-progress-fill {
             height: 100%;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             transition: width 0.5s ease;
         }
-
         .achievements {
             background: white;
             padding: 25px;
@@ -860,18 +747,15 @@
             margin-bottom: 30px;
             display: none;
         }
-
         .achievements h3 {
             color: #667eea;
             margin-bottom: 20px;
         }
-
         .achievement-grid {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
             gap: 15px;
         }
-
         .achievement {
             text-align: center;
             padding: 15px;
@@ -879,26 +763,21 @@
             border-radius: 10px;
             transition: all 0.3s;
         }
-
         .achievement.unlocked {
             background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
             color: white;
         }
-
         .achievement.locked {
             opacity: 0.4;
         }
-
         .achievement-icon {
             font-size: 40px;
             margin-bottom: 10px;
         }
-
         .achievement-name {
             font-size: 12px;
             font-weight: bold;
         }
-
         @media (max-width: 768px) {
             .cart-section {
                 grid-template-columns: 1fr;
@@ -928,7 +807,6 @@
                     <button class="avatar-btn" onclick="selectAvatar('😆')">😆</button>
                 </div>
             </div>
-
             <div class="customize-section">
                 <h3>Choose Your Theme Color</h3>
                 <div class="color-options">
@@ -942,14 +820,12 @@
                     <button class="color-btn" onclick="selectColor('sunset')" style="background: linear-gradient(135deg, #ff6e7f 0%, #bfe9ff 100%);"></button>
                 </div>
             </div>
-
             <button class="start-btn" onclick="startApp()">Start Shopping</button>
         </div>
     </div>
-
     <div class="container" id="mainApp" style="display: none;">
         <header>
-            <div class="logo">📚 Random Park Books</div>
+            <div class="logo"> Random Park Books</div>
             <div class="header-right">
                 <div class="stats-panel">
                     <div class="stat-box">
@@ -974,7 +850,6 @@
                 </div>
             </div>
         </header>
-
         <div class="dashboard">
             <div class="dashboard-card">
                 <h3>💰 Total Spent</h3>
@@ -1000,17 +875,14 @@
                 </div>
             </div>
         </div>
-
         <div class="banner">
             <h2>🎉 National Coffee Day Special! 🎉</h2>
             <p>Get 1 Ticket on any Ebook purchase! • Most Popular: Adventures of Maple and the Sky Kingdom 🔥</p>
         </div>
-
         <div class="achievements">
             <h3>🏆 Achievements</h3>
             <div class="achievement-grid" id="achievementsGrid"></div>
         </div>
-
         <div class="filters-section">
             <div class="filters">
                 <input type="text" class="search-box" id="searchBox" placeholder="🔍 Search books..." oninput="filterBooks()">
@@ -1021,9 +893,7 @@
                 <button class="filter-btn" onclick="setFilter('popular')">Popular</button>
             </div>
         </div>
-
         <div class="books-grid" id="booksGrid"></div>
-
         <div class="cart-section">
             <div class="cart">
                 <h3>🛒 Purchase History</h3>
@@ -1051,7 +921,6 @@
             </div>
         </div>
     </div>
-
     <div id="previewModal" class="modal">
         <div class="modal-content">
             <span class="close-btn" onclick="closePreview()">&times;</span>
@@ -1059,9 +928,7 @@
             <div id="previewText" class="preview-text"></div>
         </div>
     </div>
-
     <div id="notification" class="notification"></div>
-
     <div id="customizeModal" class="customize-modal">
         <div class="customize-modal-content">
             <span class="close-btn" onclick="closeCustomize()">&times;</span>
@@ -1071,7 +938,6 @@
                 <h3>Choose Your Avatar <span style="font-size: 14px; color: #999;">(Buy more books to unlock!)</span></h3>
                 <div id="avatarTiersContainer"></div>
             </div>
-
             <div class="customize-section">
                 <h3>Choose Your Theme Color</h3>
                 <div class="color-options" id="colorOptions">
@@ -1085,11 +951,9 @@
                     <button class="color-btn" onclick="selectColorMain('sunset')" style="background: linear-gradient(135deg, #ff6e7f 0%, #bfe9ff 100%);"></button>
                 </div>
             </div>
-
             <button class="start-btn" onclick="closeCustomize()">Save Changes</button>
         </div>
     </div>
-
     <div id="profileModal" class="profile-modal">
         <div class="profile-modal-content">
             <span class="close-btn" onclick="closeProfile()">&times;</span>
@@ -1099,7 +963,6 @@
                 <div class="profile-name" id="profileName">User</div>
                 <div class="profile-level">Level <span id="profileLevel">1</span></div>
             </div>
-
             <div class="profile-stats-grid">
                 <div class="profile-stat-card">
                     <div class="profile-stat-icon">🎫</div>
@@ -1122,7 +985,6 @@
                     <div class="profile-stat-label">Total Saved</div>
                 </div>
             </div>
-
             <div class="profile-section">
                 <h3>📖 Reading Stats</h3>
                 <div class="profile-stats-grid">
@@ -1148,12 +1010,10 @@
                     </div>
                 </div>
             </div>
-
             <div class="profile-section">
                 <h3>🏆 Achievements (<span id="profileAchievementCount">0</span>/15)</h3>
                 <div class="profile-achievements" id="profileAchievements"></div>
             </div>
-
             <div class="profile-section">
                 <h3>📊 Progress to Next Level</h3>
                 <div class="profile-progress-section">
@@ -1188,7 +1048,6 @@
             </div>
         </div>
     </div>
-
     <script>
         let tickets = 0;
         let userName = '';
@@ -1203,7 +1062,6 @@
         let currentFilter = 'all';
         const cart = [];
         const purchaseHistory = [];
-
         const colorThemes = {
             purple: { primary: '#667eea', secondary: '#764ba2' },
             blue: { primary: '#4facfe', secondary: '#00f2fe' },
@@ -1214,7 +1072,6 @@
             red: { primary: '#eb3349', secondary: '#f45c43' },
             sunset: { primary: '#ff6e7f', secondary: '#bfe9ff' }
         };
-
         const avatarTiers = {
             0: ['😊', '😃', '🙂', '😄', '😁', '😆'],
             3: ['🦊', '🐼', '🐨', '🐯', '🐰', '🐻'],
@@ -1226,7 +1083,6 @@
             25: ['💀', '👻', '🤖', '👽', '🎃', '🦇'],
             30: ['🐉', '🦖', '🦕', '🐙', '🦑', '🦈']
         };
-
         const achievements = [
             { id: 'first', icon: '🎉', name: 'First Purchase', condition: () => booksPurchased >= 1 },
             { id: 'collector', icon: '📚', name: 'Book Collector', condition: () => booksPurchased >= 5 },
@@ -1244,7 +1100,6 @@
             { id: 'diverse', icon: '🎨', name: 'Diverse Taste', condition: () => ebooksOwned >= 2 && physicalOwned >= 2 },
             { id: 'ultimate', icon: '👑', name: 'Ultimate Reader', condition: () => booksPurchased >= 20 }
         ];
-
         const books = [
             {
                 title: "Wacky Whispers",
@@ -1253,19 +1108,12 @@
                 rating: 4.5,
                 purchases: 145,
                 preview: `Ellie Voss had been banned from three cactus stores in her town. And not for stealing. Not even for poking the cactuses (which, for the record, she only did once. Okay, twice. Maybe four times. Whatever).
-
 She just had... a reputation.
-
 So when she walked into "Cactus Palace: Where Every Prickle Has a Purpose", the man behind the counter immediately ducked behind a pile of potted succulents.
-
 "Just looking!" Ellie called cheerfully. "No explosions today, I promise!"
-
 She strolled past a tall cactus named Spikey McNeedleface, a squat one called Sir Pokington III, and a weirdly fuzzy one with a sign that read:
-
 ❗ DO NOT PET ME. I AM NOT A CAT ❗
-
 The soft voice whispered: "Bubble gum explosion… at 2:17... bring cheese."
-
 "Either I'm losing my mind," she muttered, "or these cactuses are trying to send me on a snack-based mission."`
             },
             {
@@ -1276,9 +1124,7 @@ The soft voice whispered: "Bubble gum explosion… at 2:17... bring cheese."
                 purchases: 289,
                 popular: true,
                 preview: `Uggh! Is this how it feels to be in a game! I wish I was back in the customizer.
-
 The only problem is that, My player won't stop crashing me. It feels soooo good when his friend plays with me. It feels like he can sense something.
-
 We all went into games because of a problem. A big one.`
             },
             {
@@ -1288,9 +1134,7 @@ We all went into games because of a problem. A big one.`
                 rating: 4.6,
                 purchases: 178,
                 preview: `Ragdoll, a person in the game of stickman clash, was living life. Things were going great for him and his family, until that day.
-
 A huge cyborg named LUKE was wrecking havoc and forcing everyone to the games. He was going to take over all of the games in the entire universe.
-
 Ragdoll couldn't bear watching all of their strongest warriors fight for them in a such a way that they were losing.`
             },
             {
@@ -1302,17 +1146,11 @@ Ragdoll couldn't bear watching all of their strongest warriors fight for them in
                 popular: true,
                 badge: "BESTSELLER",
                 preview: `Maple Thistlewhip was not supposed to be in the attic.
-
 Her mother had said it plainly: "No climbing that rickety ladder, young lady. There are squirrels up there. Possibly ghosts."
-
 But the wind had whispered her name again. "Maple..."
-
 She found a strange umbrella — bright blue with silver embroidery of stars and moons. A note was pinned to the handle:
-
 "For the journey above. Hold on tight."
-
 Before Maple could blink, a gust of wind burst through the attic, and the umbrella yanked itself open — dragging her right out of the window and into the sky.
-
 She screamed — mostly in excitement.`
             },
             {
@@ -1322,17 +1160,11 @@ She screamed — mostly in excitement.`
                 rating: 4.7,
                 purchases: 234,
                 preview: `Timmy the raccoon opened his lunchbox with ultimate excitement.
-
 Inside should have been the tallest, stickiest, most perfect peanut butter and jelly sandwich in the whole forest.
-
 Now there was nothing left but a sad, soggy lettuce leaf.
-
 Timmy gasped with a noise so loud, a flock of geese changed direction mid-air.
-
 "This," he squeaked, "is a THIEVERY of epic proportions!"
-
 Barry the bear cub strolled by with an apple and frowned. "You're overreacting."
-
 Timmy snarled, "Overreacting is the only proper reaction when sandwiches are murdered!"`
             },
             {
@@ -1342,9 +1174,7 @@ Timmy snarled, "Overreacting is the only proper reaction when sandwiches are mur
                 rating: 4.4,
                 purchases: 167,
                 preview: `It was the last day of Puppet School, it was the day we were graduating.
-
 I got a score of 97/100 which was amazing with the skills I had. Then after we had the graduation ceremony we got to choose our teams or the country that we would fight for and pour every single atom of energy that we had.
-
 I chose Team India.`
             },
             {
@@ -1354,17 +1184,13 @@ I chose Team India.`
                 rating: 4.9,
                 purchases: 198,
                 preview: `The small town of Haven's End had never encountered anything remotely like the vast, shimmering dome that now stretched impossibly over the edge of the ancient forest.
-
 Twelve-year-old Lila Granger stood pressed against her bedroom window, staring wide-eyed at the strange phenomenon. Her grandfather had vanished into those woods several years ago, leaving behind only enigmatic notes and a tattered compass.
-
 Armed only with her grandfather's ancient journal and a flickering flashlight, she slipped quietly through the back door. Ready or not, she was stepping into the unknown, determined to find answers that might save her family—and the fate of the entire town.`
             }
         ];
-
         function getUserLevel() {
             return Math.floor(booksPurchased / 5) + 1;
         }
-
         function getUnlockedAvatars() {
             const unlocked = [];
             for (const [tier, emojis] of Object.entries(avatarTiers)) {
@@ -1374,7 +1200,6 @@ Armed only with her grandfather's ancient journal and a flickering flashlight, s
             }
             return unlocked;
         }
-
         function renderAvatarTiers() {
             const container = document.getElementById('avatarTiersContainer');
             const unlockedAvatars = getUnlockedAvatars();
@@ -1415,7 +1240,6 @@ Armed only with her grandfather's ancient journal and a flickering flashlight, s
             
             container.innerHTML = html;
         }
-
         function renderAchievements() {
             const container = document.getElementById('achievementsGrid');
             let unlockedCount = 0;
@@ -1434,7 +1258,6 @@ Armed only with her grandfather's ancient journal and a flickering flashlight, s
             
             document.getElementById('achievementCount').textContent = unlockedCount;
         }
-
         function selectAvatar(emoji) {
             userAvatar = emoji;
             document.querySelectorAll('.welcome-box .avatar-btn').forEach(btn => {
@@ -1444,7 +1267,6 @@ Armed only with her grandfather's ancient journal and a flickering flashlight, s
                 }
             });
         }
-
         function selectColor(color) {
             userColor = color;
             document.querySelectorAll('.welcome-box .color-btn').forEach(btn => {
@@ -1452,7 +1274,6 @@ Armed only with her grandfather's ancient journal and a flickering flashlight, s
             });
             event.target.classList.add('selected');
         }
-
         function selectAvatarMain(emoji) {
             const unlockedAvatars = getUnlockedAvatars();
             if (!unlockedAvatars.includes(emoji)) {
@@ -1465,7 +1286,6 @@ Armed only with her grandfather's ancient journal and a flickering flashlight, s
             renderAvatarTiers();
             showNotification(`Avatar changed to ${emoji}`);
         }
-
         function selectColorMain(color) {
             userColor = color;
             document.querySelectorAll('#colorOptions .color-btn').forEach(btn => {
@@ -1475,7 +1295,6 @@ Armed only with her grandfather's ancient journal and a flickering flashlight, s
             applyTheme();
             showNotification(`Theme changed to ${color}!`);
         }
-
         function openCustomize() {
             document.getElementById('customizeModal').style.display = 'block';
             renderAvatarTiers();
@@ -1488,20 +1307,16 @@ Armed only with her grandfather's ancient journal and a flickering flashlight, s
                 }
             });
         }
-
         function closeCustomize() {
             document.getElementById('customizeModal').style.display = 'none';
         }
-
         function openProfile() {
             document.getElementById('profileModal').style.display = 'block';
             updateProfileModal();
         }
-
         function closeProfile() {
             document.getElementById('profileModal').style.display = 'none';
         }
-
         function updateProfileModal() {
             document.getElementById('profileAvatar').textContent = userAvatar;
             document.getElementById('profileName').textContent = userName;
@@ -1553,7 +1368,6 @@ Armed only with her grandfather's ancient journal and a flickering flashlight, s
             document.getElementById('profileCollectionPercent').textContent = collectionPercent;
             document.getElementById('profileCollectionBar').style.width = collectionPercent + '%';
         }
-
         function applyTheme() {
             const theme = colorThemes[userColor];
             document.body.style.background = `linear-gradient(135deg, ${theme.primary} 0%, ${theme.secondary} 100%)`;
@@ -1587,7 +1401,6 @@ Armed only with her grandfather's ancient journal and a flickering flashlight, s
             `;
             document.head.appendChild(style);
         }
-
         function startApp() {
             const nameInput = document.getElementById('userName');
             const ticketsInput = document.getElementById('userTickets');
@@ -1615,7 +1428,6 @@ Armed only with her grandfather's ancient journal and a flickering flashlight, s
             renderAchievements();
             updateDisplay();
         }
-
         function renderBooks() {
             const grid = document.getElementById('booksGrid');
             const searchTerm = document.getElementById('searchBox').value.toLowerCase();
@@ -1674,7 +1486,6 @@ Armed only with her grandfather's ancient journal and a flickering flashlight, s
             `;
             }).join('');
         }
-
         function buyBook(index, type) {
             const book = books[index];
             const price = type === 'ebook' ? book.ebookPrice : book.physicalPrice;
@@ -1728,7 +1539,6 @@ Armed only with her grandfather's ancient journal and a flickering flashlight, s
                 showNotification(`❌ Not enough tickets! You need ${price}T but only have ${tickets}T`);
             }
         }
-
         function updateDisplay() {
             document.getElementById('ticketCount').textContent = tickets;
             document.getElementById('booksBadge').textContent = booksPurchased;
@@ -1773,18 +1583,15 @@ Armed only with her grandfather's ancient journal and a flickering flashlight, s
                 document.getElementById('favoriteType').textContent = '-';
             }
         }
-
         function showPreview(index) {
             const book = books[index];
             document.getElementById('previewTitle').textContent = book.title;
             document.getElementById('previewText').textContent = book.preview;
             document.getElementById('previewModal').style.display = 'block';
         }
-
         function closePreview() {
             document.getElementById('previewModal').style.display = 'none';
         }
-
         function showNotification(message) {
             const notif = document.getElementById('notification');
             notif.textContent = message;
@@ -1793,43 +1600,35 @@ Armed only with her grandfather's ancient journal and a flickering flashlight, s
                 notif.style.display = 'none';
             }, 3000);
         }
-
         function setFilter(filter) {
             currentFilter = filter;
             document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
             event.target.classList.add('active');
             renderBooks();
         }
-
         function filterBooks() {
             renderBooks();
         }
-
         function showStats() {
             const stats = `
 📊 Detailed Statistics
-
 Total Books Purchased: ${booksPurchased}
 Current Level: ${getUserLevel()}
 Ebooks Owned: ${ebooksOwned}
 Physical Books Owned: ${physicalOwned}
-
 💰 Financial Stats:
 Total Spent: ${totalSpent}T
 Total Saved: ${totalSaved}T
 Tickets Earned: ${ticketsEarned}T
 Net Spending: ${totalSpent - ticketsEarned}T
-
 🏆 Achievement Progress:
 Unlocked: ${document.getElementById('achievementCount').textContent}
-
 🎨 Customization:
 Unlocked Avatars: ${getUnlockedAvatars().length}
 Current Theme: ${userColor}
             `;
             alert(stats);
         }
-
         window.onclick = function(event) {
             const previewModal = document.getElementById('previewModal');
             const customizeModal = document.getElementById('customizeModal');
@@ -1847,3 +1646,4 @@ Current Theme: ${userColor}
     </script>
 </body>
 </html>
+
