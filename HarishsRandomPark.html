@@ -833,6 +833,32 @@
                 opacity: 1;
             }
         }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-20px); }
+        }
+        
+        #bookReaderModal .modal-content {
+            position: relative;
+            overflow: hidden;
+        }
+        
+        #bookReaderModal .modal-content::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(67, 233, 123, 0.1) 0%, transparent 70%);
+            animation: pulse 4s ease-in-out infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 0.5; transform: scale(1); }
+            50% { opacity: 1; transform: scale(1.1); }
+        }
         
         /* Responsive */
         @media (max-width: 1024px) {
@@ -1229,40 +1255,47 @@
         </div>
     </div>
 
-    <style>
-        @keyframes float {
-            0%, 100% { transform: translateY(0px); }
-            50% { transform: translateY(-20px); }
-        }
-        
-        #bookReaderModal .modal-content {
-            position: relative;
-            overflow: hidden;
-        }
-        
-        #bookReaderModal .modal-content::before {
-            content: '';
-            position: absolute;
-            top: -50%;
-            left: -50%;
-            width: 200%;
-            height: 200%;
-            background: radial-gradient(circle, rgba(67, 233, 123, 0.1) 0%, transparent 70%);
-            animation: pulse 4s ease-in-out infinite;
-        }
-        
-        @keyframes pulse {
-            0%, 100% { opacity: 0.5; transform: scale(1); }
-            50% { opacity: 1; transform: scale(1.1); }
-        }
-    </style>
-
     <script>
-        // Obfuscated admin password
+        // Obfuscated admin password (Base64 encoded)
         const ADMIN_PASSWORD = (function() {
-            const encoded = 'ZXVyZWth';
+            const encoded = 'ZXVyZWth'; // Base64 encoded password
             return atob(encoded);
         })();
+        
+        // Storage key for logged in users
+        const LOGGED_IN_USERS_KEY = 'randomParkBooks_loggedInUsers';
+        
+        // Get currently logged in users
+        function getLoggedInUsers() {
+            const stored = localStorage.getItem(LOGGED_IN_USERS_KEY);
+            return stored ? JSON.parse(stored) : [];
+        }
+        
+        // Check if user is already logged in
+        function isUserLoggedIn(firstName, lastName) {
+            const loggedIn = getLoggedInUsers();
+            return loggedIn.some(user => 
+                user.first.toLowerCase() === firstName.toLowerCase() && 
+                user.last.toLowerCase() === lastName.toLowerCase()
+            );
+        }
+        
+        // Add user to logged in list
+        function addLoggedInUser(firstName, lastName) {
+            const loggedIn = getLoggedInUsers();
+            loggedIn.push({ first: firstName, last: lastName, timestamp: Date.now() });
+            localStorage.setItem(LOGGED_IN_USERS_KEY, JSON.stringify(loggedIn));
+        }
+        
+        // Remove user from logged in list
+        function removeLoggedInUser(firstName, lastName) {
+            const loggedIn = getLoggedInUsers();
+            const filtered = loggedIn.filter(user => 
+                !(user.first.toLowerCase() === firstName.toLowerCase() && 
+                  user.last.toLowerCase() === lastName.toLowerCase())
+            );
+            localStorage.setItem(LOGGED_IN_USERS_KEY, JSON.stringify(filtered));
+        }
         
         // Authorized users list
         const AUTHORIZED_USERS = [
@@ -1304,6 +1337,14 @@
             return firstName.toLowerCase() === 'unown' && lastName.toLowerCase() === 's';
         }
         
+        // Check if user is authorized
+        function isAuthorizedUser(firstName, lastName) {
+            return AUTHORIZED_USERS.some(user => 
+                user.first.toLowerCase() === firstName.toLowerCase() && 
+                user.last.toLowerCase() === lastName.toLowerCase()
+            );
+        }
+        
         // App State
         let state = {
             name: '',
@@ -1315,7 +1356,9 @@
             achievements: [],
             currentFilter: 'all',
             isSpecialAdmin: false,
-            deliveredBooks: [] // Books delivered directly by admin
+            firstName: '',
+            lastName: '',
+            deliveredBooks: []
         };
         
         // Global orders storage
@@ -1419,13 +1462,11 @@
                 books = JSON.parse(savedBooks);
             }
             
-            // Load global orders (accessible by Unown S)
             const savedGlobalOrders = localStorage.getItem('randomParkBooks_globalOrders');
             if (savedGlobalOrders) {
                 globalOrders = JSON.parse(savedGlobalOrders);
             }
             
-            // Load global delivered books
             const savedGlobalDeliveredBooks = localStorage.getItem('randomParkBooks_globalDeliveredBooks');
             if (savedGlobalDeliveredBooks) {
                 globalDeliveredBooks = JSON.parse(savedGlobalDeliveredBooks);
@@ -1438,14 +1479,6 @@
             localStorage.setItem('randomParkBooks_books', JSON.stringify(books));
             localStorage.setItem('randomParkBooks_globalOrders', JSON.stringify(globalOrders));
             localStorage.setItem('randomParkBooks_globalDeliveredBooks', JSON.stringify(globalDeliveredBooks));
-        }
-
-        // Check if user is authorized
-        function isAuthorizedUser(firstName, lastName) {
-            return AUTHORIZED_USERS.some(user => 
-                user.first.toLowerCase() === firstName.toLowerCase() && 
-                user.last.toLowerCase() === lastName.toLowerCase()
-            );
         }
 
         // Welcome Screen Functions
@@ -1475,9 +1508,30 @@
                 return;
             }
             
+            // Check if trying to login as Unown S
+            if (isSpecialAdmin(firstName, lastName)) {
+                // Require admin password for Unown S
+                const password = prompt('🔐 Admin password required for Unown S:');
+                if (password !== ADMIN_PASSWORD) {
+                    showNotification('❌ Incorrect admin password!');
+                    return;
+                }
+            }
+            
+            // Check if user is already logged in
+            if (isUserLoggedIn(firstName, lastName)) {
+                showNotification('❌ This user is already logged in! Only one session allowed per user.');
+                return;
+            }
+            
             state.name = `${firstName} ${lastName}`;
             state.email = firstName.toLowerCase() + '.' + lastName.toLowerCase() + '@randomparkbooks.com';
             state.isSpecialAdmin = isSpecialAdmin(firstName, lastName);
+            state.firstName = firstName;
+            state.lastName = lastName;
+            
+            // Add to logged in users
+            addLoggedInUser(firstName, lastName);
             
             document.getElementById('welcomeScreen').style.display = 'none';
             document.getElementById('mainApp').style.display = 'block';
@@ -1497,6 +1551,11 @@
         function logout() {
             if (!confirm('Are you sure you want to logout?')) return;
             
+            // Remove user from logged in list
+            if (state.firstName && state.lastName) {
+                removeLoggedInUser(state.firstName, state.lastName);
+            }
+            
             // Close profile modal first
             closeProfile();
             
@@ -1511,7 +1570,10 @@
                 orders: [],
                 achievements: [],
                 currentFilter: 'all',
-                isSpecialAdmin: false
+                isSpecialAdmin: false,
+                firstName: '',
+                lastName: '',
+                deliveredBooks: []
             };
             
             // Reset form
