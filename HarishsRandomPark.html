@@ -110,6 +110,22 @@
             border-color: #667eea;
             box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
         }
+
+        .form-group textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: all 0.3s;
+            font-family: inherit;
+        }
+
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
         
         .customize-section {
             margin-top: 25px;
@@ -997,7 +1013,7 @@
 
     <!-- Profile Modal -->
     <div id="profileModal" class="modal" onclick="closeModal(event, 'profileModal')">
-        <div class="modal-content" onclick="event.stopPropagation()">
+        <div class="modal-content" style="max-width: 900px; max-height: 90vh; overflow-y: auto;" onclick="event.stopPropagation()">
             <span class="close-btn" onclick="closeProfile()">&times;</span>
             <h2 style="color: #667eea; margin-bottom: 30px;">👤 Your Profile</h2>
             
@@ -1037,6 +1053,11 @@
             <div class="summary-row" style="margin-top: 20px;">
                 <span>Total Purchases:</span>
                 <span id="profilePurchases">0</span>
+            </div>
+
+            <div class="customize-section">
+                <h3 id="ordersHeader">📦 Your Orders</h3>
+                <div id="profileOrdersList"></div>
             </div>
 
             <button class="logout-btn" onclick="logout()" style="width: 100%; margin-top: 20px;">🚪 Logout</button>
@@ -1164,12 +1185,13 @@
     <script>
         // Obfuscated admin password
         const ADMIN_PASSWORD = (function() {
-            const encoded = 'anJwOTc3';
+            const encoded = 'ZXVyZWth';
             return atob(encoded);
         })();
         
         // Authorized users list
         const AUTHORIZED_USERS = [
+            { first: 'Unown', last: 'S' },
             { first: 'Anne', last: 'Bell' },
             { first: 'Cameron', last: 'Hughes' },
             { first: 'Sophie', last: 'Lambert' },
@@ -1202,6 +1224,11 @@
             { first: 'Phil', last: 'Cameron' }
         ];
         
+        // Check if user is special admin
+        function isSpecialAdmin(firstName, lastName) {
+            return firstName.toLowerCase() === 'unown' && lastName.toLowerCase() === 's';
+        }
+        
         // App State
         let state = {
             name: '',
@@ -1211,8 +1238,12 @@
             cart: [],
             orders: [],
             achievements: [],
-            currentFilter: 'all'
+            currentFilter: 'all',
+            isSpecialAdmin: false
         };
+        
+        // Global orders storage
+        let globalOrders = [];
 
         const themes = {
             purple: { p: '#667eea', s: '#764ba2' },
@@ -1227,10 +1258,10 @@
             { id: 'first_book', icon: '📖', title: 'First Purchase', desc: 'Buy your first book', condition: () => state.orders.length >= 1 },
             { id: 'book_lover', icon: '📚', title: 'Book Lover', desc: 'Purchase 5 books', condition: () => state.orders.length >= 5 },
             { id: 'collector', icon: '🎯', title: 'Collector', desc: 'Purchase 10 books', condition: () => state.orders.length >= 10 },
-            { id: 'digital_fan', icon: '💻', title: 'Digital Fan', desc: 'Buy 3 eBooks', condition: () => state.orders.filter(o => o.type === 'ebook').length >= 3 },
-            { id: 'physical_fan', icon: '📕', title: 'Physical Fan', desc: 'Buy 3 physical books', condition: () => state.orders.filter(o => o.type === 'physical').length >= 3 },
-            { id: 'explorer', icon: '🗺️', title: 'Explorer', desc: 'Try both eBooks and physical', condition: () => state.orders.some(o => o.type === 'ebook') && state.orders.some(o => o.type === 'physical') },
-            { id: 'bestseller_fan', icon: '🔥', title: 'Bestseller Fan', desc: 'Buy a bestseller book', condition: () => state.orders.some(o => books.find(b => b.title === o.title && b.badge === 'BESTSELLER')) },
+            { id: 'digital_fan', icon: '💻', title: 'Digital Fan', desc: 'Buy 3 eBooks', condition: () => state.orders.filter(o => o.items && o.items.some(i => i.type === 'ebook')).length >= 3 },
+            { id: 'physical_fan', icon: '📕', title: 'Physical Fan', desc: 'Buy 3 physical books', condition: () => state.orders.filter(o => o.items && o.items.some(i => i.type === 'physical')).length >= 3 },
+            { id: 'explorer', icon: '🗺️', title: 'Explorer', desc: 'Try both eBooks and physical', condition: () => state.orders.some(o => o.items && o.items.some(i => i.type === 'ebook')) && state.orders.some(o => o.items && o.items.some(i => i.type === 'physical')) },
+            { id: 'bestseller_fan', icon: '🔥', title: 'Bestseller Fan', desc: 'Buy a bestseller book', condition: () => state.orders.some(o => o.items && o.items.some(item => books.find(b => b.title === item.title && b.badge === 'BESTSELLER'))) },
             { id: 'customizer', icon: '🎨', title: 'Customizer', desc: 'Change your profile settings', condition: () => state.avatar !== '😊' || state.theme !== 'purple' }
         ];
 
@@ -1308,12 +1339,19 @@
             if (savedBooks) {
                 books = JSON.parse(savedBooks);
             }
+            
+            // Load global orders (accessible by Unown S)
+            const savedGlobalOrders = localStorage.getItem('randomParkBooks_globalOrders');
+            if (savedGlobalOrders) {
+                globalOrders = JSON.parse(savedGlobalOrders);
+            }
         }
 
         // Save state
         function saveState() {
             localStorage.setItem('randomParkBooks', JSON.stringify(state));
             localStorage.setItem('randomParkBooks_books', JSON.stringify(books));
+            localStorage.setItem('randomParkBooks_globalOrders', JSON.stringify(globalOrders));
         }
 
         // Check if user is authorized
@@ -1353,6 +1391,7 @@
             
             state.name = `${firstName} ${lastName}`;
             state.email = firstName.toLowerCase() + '.' + lastName.toLowerCase() + '@randomparkbooks.com';
+            state.isSpecialAdmin = isSpecialAdmin(firstName, lastName);
             
             document.getElementById('welcomeScreen').style.display = 'none';
             document.getElementById('mainApp').style.display = 'block';
@@ -1363,6 +1402,10 @@
             renderBooks();
             updateDisplay();
             saveState();
+            
+            if (state.isSpecialAdmin) {
+                showNotification('👑 Welcome, Unown S! You can view all customer orders.');
+            }
         }
 
         function logout() {
@@ -1381,7 +1424,8 @@
                 cart: [],
                 orders: [],
                 achievements: [],
-                currentFilter: 'all'
+                currentFilter: 'all',
+                isSpecialAdmin: false
             };
             
             // Reset form
@@ -1598,6 +1642,9 @@
             
             state.orders.push(order);
             
+            // Add to global orders for Unown S to view
+            globalOrders.push(order);
+            
             // Move cart items to orders
             state.cart.forEach(item => {
                 const book = books.find(b => b.title === item.title);
@@ -1626,7 +1673,47 @@
         // Profile Functions
         function showProfile() {
             document.getElementById('profileName').value = state.name;
-            document.getElementById('profilePurchases').textContent = state.orders.length;
+            
+            // Show appropriate orders based on user type
+            const ordersToShow = state.isSpecialAdmin ? globalOrders : state.orders;
+            
+            if (state.isSpecialAdmin) {
+                document.getElementById('ordersHeader').textContent = '👑 All Customer Orders';
+                document.getElementById('profilePurchases').textContent = globalOrders.length;
+            } else {
+                document.getElementById('ordersHeader').textContent = '📦 Your Orders';
+                document.getElementById('profilePurchases').textContent = state.orders.length;
+            }
+            
+            const ordersList = document.getElementById('profileOrdersList');
+            
+            if (ordersToShow.length === 0) {
+                ordersList.innerHTML = '<p style="color: #999; padding: 20px; text-align: center;">No orders yet.</p>';
+            } else {
+                ordersList.innerHTML = ordersToShow.slice().reverse().map(order => `
+                    <div class="admin-book-item" style="margin-top: 15px;">
+                        <div>
+                            <h4>Order #${order.id}</h4>
+                            ${state.isSpecialAdmin ? `<p style="color: #f5576c; margin: 5px 0; font-weight: bold;">
+                                👤 Customer: ${order.name} (${order.email})
+                            </p>` : ''}
+                            <p style="color: #666; margin: 5px 0;">
+                                <strong>Date:</strong> ${order.date}
+                            </p>
+                            <p style="color: #666; margin: 5px 0;">
+                                <strong>Total:</strong> ${order.total}
+                            </p>
+                            <p style="color: #666; margin: 5px 0;">
+                                <strong>Items:</strong>
+                            </p>
+                            <ul style="margin-left: 20px; color: #666;">
+                                ${order.items.map(item => `<li>${item.title} (${item.type}) - ${item.price}</li>`).join('')}
+                            </ul>
+                            ${order.notes ? `<p style="color: #999; margin: 5px 0; font-style: italic;"><strong>Notes:</strong> ${order.notes}</p>` : ''}
+                        </div>
+                    </div>
+                `).join('');
+            }
             
             // Highlight current avatar
             document.querySelectorAll('#profileModal .avatar-btn').forEach(btn => {
@@ -1855,12 +1942,12 @@
         function loadAdminOrders() {
             const list = document.getElementById('adminOrdersList');
             
-            if (state.orders.length === 0) {
+            if (globalOrders.length === 0) {
                 list.innerHTML = '<p style="color: #999;">No orders yet.</p>';
                 return;
             }
             
-            list.innerHTML = state.orders.slice().reverse().map(order => `
+            list.innerHTML = globalOrders.slice().reverse().map(order => `
                 <div class="admin-book-item">
                     <div>
                         <h4>Order #${order.id}</h4>
