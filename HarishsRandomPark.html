@@ -436,6 +436,16 @@
             font-weight: bold;
         }
         
+        .book-card.delivered-book {
+            border: 3px solid #43e97b;
+            box-shadow: 0 8px 32px rgba(67, 233, 123, 0.3);
+        }
+        
+        .book-card.delivered-book::before {
+            background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+            transform: scaleX(1);
+        }
+        
         .book-rating {
             display: flex;
             gap: 5px;
@@ -1147,6 +1157,25 @@
                 <div id="adminOrdersList">
                     <p style="color: #999;">No orders yet.</p>
                 </div>
+                
+                <div style="margin-top: 40px; padding-top: 30px; border-top: 3px solid #667eea;">
+                    <h3 style="color: #667eea; margin-bottom: 20px;">📚 Deliver Book Directly</h3>
+                    <p style="color: #666; margin-bottom: 20px;">Send a book directly to a customer without them placing an order.</p>
+                    
+                    <div class="form-group">
+                        <label>Customer Name:</label>
+                        <input type="text" id="deliverCustomerName" placeholder="e.g., Anne Bell">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Select Book:</label>
+                        <select id="deliverBookSelect" style="width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 14px;">
+                            <option value="">-- Choose a book --</option>
+                        </select>
+                    </div>
+                    
+                    <button class="checkout-btn" onclick="deliverBookToCustomer()">📤 Send Book to Customer</button>
+                </div>
             </div>
         </div>
     </div>
@@ -1181,6 +1210,52 @@
 
     <!-- Notification -->
     <div id="notification" class="notification"></div>
+    
+    <!-- Book Reader Modal -->
+    <div id="bookReaderModal" class="modal" onclick="closeModal(event, 'bookReaderModal')">
+        <div class="modal-content" style="max-width: 900px; max-height: 90vh; overflow-y: auto; background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%); color: white; box-shadow: 0 0 50px rgba(102, 126, 234, 0.5);" onclick="event.stopPropagation()">
+            <span class="close-btn" onclick="closeBookReader()" style="color: white;">&times;</span>
+            
+            <div style="text-align: center; padding: 40px 20px;">
+                <div style="font-size: 60px; margin-bottom: 20px; animation: float 3s ease-in-out infinite;">📖</div>
+                <h2 id="readerBookTitle" style="color: #43e97b; margin-bottom: 30px; font-size: 32px; text-shadow: 0 0 20px rgba(67, 233, 123, 0.5);"></h2>
+                
+                <div style="background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(10px); border-radius: 20px; padding: 40px; margin: 20px 0; border: 2px solid rgba(67, 233, 123, 0.3); box-shadow: 0 0 30px rgba(67, 233, 123, 0.2);">
+                    <div id="readerBookContent" style="line-height: 2; font-size: 18px; text-align: left; white-space: pre-wrap; color: #e0e0e0;"></div>
+                </div>
+                
+                <div style="margin-top: 30px; font-size: 24px; opacity: 0.7;">✨ ⭐ ✨</div>
+            </div>
+        </div>
+    </div>
+
+    <style>
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-20px); }
+        }
+        
+        #bookReaderModal .modal-content {
+            position: relative;
+            overflow: hidden;
+        }
+        
+        #bookReaderModal .modal-content::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(67, 233, 123, 0.1) 0%, transparent 70%);
+            animation: pulse 4s ease-in-out infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 0.5; transform: scale(1); }
+            50% { opacity: 1; transform: scale(1.1); }
+        }
+    </style>
 
     <script>
         // Obfuscated admin password
@@ -1239,11 +1314,15 @@
             orders: [],
             achievements: [],
             currentFilter: 'all',
-            isSpecialAdmin: false
+            isSpecialAdmin: false,
+            deliveredBooks: [] // Books delivered directly by admin
         };
         
         // Global orders storage
         let globalOrders = [];
+        
+        // Global delivered books storage
+        let globalDeliveredBooks = [];
 
         const themes = {
             purple: { p: '#667eea', s: '#764ba2' },
@@ -1345,6 +1424,12 @@
             if (savedGlobalOrders) {
                 globalOrders = JSON.parse(savedGlobalOrders);
             }
+            
+            // Load global delivered books
+            const savedGlobalDeliveredBooks = localStorage.getItem('randomParkBooks_globalDeliveredBooks');
+            if (savedGlobalDeliveredBooks) {
+                globalDeliveredBooks = JSON.parse(savedGlobalDeliveredBooks);
+            }
         }
 
         // Save state
@@ -1352,6 +1437,7 @@
             localStorage.setItem('randomParkBooks', JSON.stringify(state));
             localStorage.setItem('randomParkBooks_books', JSON.stringify(books));
             localStorage.setItem('randomParkBooks_globalOrders', JSON.stringify(globalOrders));
+            localStorage.setItem('randomParkBooks_globalDeliveredBooks', JSON.stringify(globalDeliveredBooks));
         }
 
         // Check if user is authorized
@@ -1818,6 +1904,7 @@
         function openAdminPanel() {
             loadAdminBooks();
             loadAdminOrders();
+            populateBookDropdown();
             document.getElementById('adminPanel').style.display = 'block';
         }
 
@@ -1839,7 +1926,65 @@
             } else if (tab === 'orders') {
                 document.getElementById('adminOrdersSection').classList.add('active');
                 loadAdminOrders();
+                populateBookDropdown();
             }
+        }
+        
+        function populateBookDropdown() {
+            const select = document.getElementById('deliverBookSelect');
+            select.innerHTML = '<option value="">-- Choose a book --</option>' + 
+                books.map((book, index) => `<option value="${index}">${book.title}</option>`).join('');
+        }
+        
+        function deliverBookToCustomer() {
+            const customerName = document.getElementById('deliverCustomerName').value.trim();
+            const bookIndex = document.getElementById('deliverBookSelect').value;
+            
+            if (!customerName) {
+                showNotification('❌ Please enter a customer name!');
+                return;
+            }
+            
+            if (bookIndex === '') {
+                showNotification('❌ Please select a book!');
+                return;
+            }
+            
+            const book = books[parseInt(bookIndex)];
+            
+            // Create delivered book record
+            const deliveredBook = {
+                id: Date.now(),
+                customerName: customerName,
+                bookTitle: book.title,
+                bookContent: book.preview,
+                date: new Date().toLocaleString()
+            };
+            
+            globalDeliveredBooks.push(deliveredBook);
+            saveState();
+            
+            // Clear form
+            document.getElementById('deliverCustomerName').value = '';
+            document.getElementById('deliverBookSelect').value = '';
+            
+            showNotification(`✅ "${book.title}" delivered to ${customerName}!`);
+        }
+        
+        function readBook(bookTitle) {
+            const book = books.find(b => b.title === bookTitle);
+            if (!book) {
+                showNotification('❌ Book not found!');
+                return;
+            }
+            
+            document.getElementById('readerBookTitle').textContent = book.title;
+            document.getElementById('readerBookContent').textContent = book.preview;
+            document.getElementById('bookReaderModal').style.display = 'block';
+        }
+        
+        function closeBookReader() {
+            document.getElementById('bookReaderModal').style.display = 'none';
         }
 
         function loadAdminBooks() {
