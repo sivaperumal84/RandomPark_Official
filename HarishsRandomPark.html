@@ -823,6 +823,18 @@
             font-weight: 600;
         }
         
+        .notification.success {
+            background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+        }
+        
+        .notification.error {
+            background: linear-gradient(135deg, #f5576c 0%, #f093fb 100%);
+        }
+        
+        .notification.info {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+        }
+        
         @keyframes slideInRight {
             from {
                 transform: translateX(400px);
@@ -858,6 +870,51 @@
         @keyframes pulse {
             0%, 100% { opacity: 0.5; transform: scale(1); }
             50% { opacity: 1; transform: scale(1.1); }
+        }
+        
+        /* Loading spinner */
+        .loading-spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 0.8s linear infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        /* Book card hover effect enhancement */
+        .book-card:hover .book-title {
+            color: #667eea;
+            transition: color 0.3s;
+        }
+        
+        /* Smooth scroll */
+        html {
+            scroll-behavior: smooth;
+        }
+        
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 10px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 10px;
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 10px;
+        }
+        
+        ::-webkit-scrollbar-thumb:hover {
+            background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
         }
         
         /* Responsive */
@@ -976,6 +1033,10 @@
                         <span>🏆</span>
                         <span><span id="achievementCount">0</span>/<span id="totalAchievements">8</span></span>
                     </div>
+                    <div class="stat-box" onclick="showRewards()">
+                        <span>🎁</span>
+                        <span>Rewards</span>
+                    </div>
                     <div class="stat-box" onclick="showProfile()">
                         <span>⚙️</span>
                         <span>Profile</span>
@@ -994,7 +1055,7 @@
 
         <div class="banner">
             <h2>🎉 Find Your Next Favorite Book! 🎉</h2>
-            <p>Browse our collection • Add to cart • Checkout via email</p>
+            <p>Browse our collection • Add to cart • Complete your order</p>
         </div>
 
         <div class="filters-section">
@@ -1032,7 +1093,7 @@
                     <span id="physicalCount">0</span>
                 </div>
                 <button class="checkout-btn" onclick="proceedToCheckout()" id="checkoutBtn" disabled>
-                    📧 Proceed to Checkout
+                    🛒 Complete Order
                 </button>
             </div>
         </div>
@@ -1090,10 +1151,20 @@
                 <span>Total Purchases:</span>
                 <span id="profilePurchases">0</span>
             </div>
+            
+            <div class="summary-row">
+                <span>🎁 Reward Points:</span>
+                <span id="profileRewardPoints" style="color: #f5576c; font-weight: bold;">0</span>
+            </div>
 
             <div class="customize-section">
                 <h3 id="ordersHeader">📦 Your Orders</h3>
                 <div id="profileOrdersList"></div>
+            </div>
+            
+            <div class="customize-section" id="deliveredBooksSection" style="display: none;">
+                <h3>📚 Books Delivered to You</h3>
+                <div id="profileDeliveredBooks"></div>
             </div>
 
             <button class="logout-btn" onclick="logout()" style="width: 100%; margin-top: 20px;">🚪 Logout</button>
@@ -1106,6 +1177,23 @@
             <span class="close-btn" onclick="closeAchievements()">&times;</span>
             <h2 style="color: #667eea; margin-bottom: 30px;">🏆 Achievements</h2>
             <div class="achievements-grid" id="achievementsList"></div>
+        </div>
+    </div>
+
+    <!-- Rewards Modal -->
+    <div id="rewardsModal" class="modal" onclick="closeModal(event, 'rewardsModal')">
+        <div class="modal-content" style="max-width: 900px;" onclick="event.stopPropagation()">
+            <span class="close-btn" onclick="closeRewards()">&times;</span>
+            <h2 style="color: #667eea; margin-bottom: 20px;">🎁 Rewards Center</h2>
+            
+            <div style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); padding: 25px; border-radius: 15px; margin-bottom: 30px; color: white; text-align: center;">
+                <h3 style="font-size: 24px; margin-bottom: 10px;">Your Points Balance</h3>
+                <div style="font-size: 48px; font-weight: bold;" id="rewardPoints">0</div>
+                <p style="opacity: 0.9; margin-top: 10px;">Earn points by purchasing books!</p>
+            </div>
+
+            <h3 style="color: #667eea; margin-bottom: 20px;">🛍️ Redeem Rewards</h3>
+            <div class="achievements-grid" id="rewardsList"></div>
         </div>
     </div>
 
@@ -1200,6 +1288,12 @@
                         </select>
                     </div>
                     
+                    <div class="form-group">
+                        <label>Book Content (Full Text):</label>
+                        <textarea id="deliverBookContent" rows="10" placeholder="Paste the full book content here... (up to 10,000,000 words)" maxlength="60000000" style="font-family: monospace; font-size: 13px;"></textarea>
+                        <small style="color: #999; display: block; margin-top: 5px;">This text will appear when the customer reads the book.</small>
+                    </div>
+                    
                     <button class="checkout-btn" onclick="deliverBookToCustomer()">📤 Send Book to Customer</button>
                 </div>
             </div>
@@ -1210,7 +1304,7 @@
     <div id="checkoutModal" class="modal" onclick="closeModal(event, 'checkoutModal')">
         <div class="modal-content" onclick="event.stopPropagation()">
             <span class="close-btn" onclick="closeCheckout()">&times;</span>
-            <h2 style="color: #667eea; margin-bottom: 30px;">📧 Complete Your Order</h2>
+            <h2 style="color: #667eea; margin-bottom: 30px;">🛒 Complete Your Order</h2>
             
             <div style="background: #f8f9fa; padding: 20px; border-radius: 12px; margin-bottom: 20px;">
                 <h3 style="margin-bottom: 10px;">Order Summary:</h3>
@@ -1222,15 +1316,11 @@
                 <input type="text" id="checkoutName" readonly>
             </div>
             <div class="form-group">
-                <label>Your Email:</label>
-                <input type="email" id="checkoutEmail" readonly>
-            </div>
-            <div class="form-group">
                 <label>Additional Notes (optional):</label>
-                <textarea id="checkoutNotes" rows="3" placeholder="Any special requests or delivery instructions..."></textarea>
+                <textarea id="checkoutNotes" rows="3" placeholder="Any special requests or notes..."></textarea>
             </div>
             
-            <button class="checkout-btn" onclick="confirmOrder()">✅ Confirm & Send Order</button>
+            <button class="checkout-btn" onclick="confirmOrder()">✅ Confirm Order</button>
         </div>
     </div>
 
@@ -1358,7 +1448,9 @@
             isSpecialAdmin: false,
             firstName: '',
             lastName: '',
-            deliveredBooks: []
+            deliveredBooks: [],
+            rewardPoints: 0,
+            redeemedRewards: []
         };
         
         // Global orders storage
@@ -1387,6 +1479,17 @@
             { id: 'customizer', icon: '🎨', title: 'Customizer', desc: 'Change your profile settings', condition: () => state.avatar !== '😊' || state.theme !== 'purple' }
         ];
 
+        const rewardsList = [
+            { id: 'discount_5', icon: '🎫', title: '5% Discount', desc: 'Get 5% off your next purchase', cost: 50, type: 'discount' },
+            { id: 'discount_10', icon: '🎟️', title: '10% Discount', desc: 'Get 10% off your next purchase', cost: 100, type: 'discount' },
+            { id: 'discount_20', icon: '🏷️', title: '20% Discount', desc: 'Get 20% off your next purchase', cost: 200, type: 'discount' },
+            { id: 'free_ebook', icon: '📱', title: 'Free eBook', desc: 'Get any eBook for free', cost: 150, type: 'freebie' },
+            { id: 'free_physical', icon: '📚', title: 'Free Physical Book', desc: 'Get any physical book for free', cost: 300, type: 'freebie' },
+            { id: 'exclusive_badge', icon: '⭐', title: 'VIP Badge', desc: 'Get an exclusive VIP badge', cost: 250, type: 'badge' },
+            { id: 'early_access', icon: '🚀', title: 'Early Access', desc: 'Get early access to new releases', cost: 400, type: 'perk' },
+            { id: 'book_bundle', icon: '🎁', title: 'Book Bundle', desc: 'Get 3 random books', cost: 500, type: 'bundle' }
+        ];
+
         let books = [
             {
                 title: "Wacky Whispers",
@@ -1394,7 +1497,8 @@
                 physical: 7,
                 rating: 4.5,
                 sales: 145,
-                preview: "Ellie Voss had been banned from three cactus stores in her town. And not for stealing. Not even for poking the cactuses (which, for the record, she only did once. Okay, twice. Maybe four times. Whatever).\n\nShe just had... a reputation.\n\nSo when she walked into \"Cactus Palace: Where Every Prickle Has a Purpose\", the man behind the counter immediately ducked behind a pile of potted succulents.\n\n\"Just looking!\" Ellie called cheerfully. \"No explosions today, I promise!\""
+                preview: "Chapter 1: \"Did That Cactus Just Whisper at Me?\"\n\nEllie Voss had been banned from three cactus stores in her town. And not for stealing. Not even for poking the cactuses (which, for the record, she only did once. Okay, twice. Maybe four times. Whatever).\n\nShe just had... a reputation.\n\nSo when she walked into \"Cactus Palace: Where Every Prickle Has a Purpose\", the man behind the counter immediately ducked behind a pile of potted succulents.\n\n\"Just looking!\" Ellie called cheerfully. \"No explosions today, I promise!\"\n\nShe strolled past a tall cactus named Spikey McNeedleface, a squat one called Sir Pokington III, and a weirdly fuzzy one with a sign that read:\n\n❗ DO NOT PET ME. I AM NOT A CAT ❗\n\nEllie was about to take a picture of the Not-A-Cat-Cactus when it happened.\n\nA soft voice, right next to her ear, whispered:\n\n\"Bubble gum explosion… at 2:17... bring cheese.\"\n\nEllie froze. She looked to her left. Nothing. She looked to her right. Just a cactus wearing tiny sunglasses.\n\n\"Um... hello?\" she said.\n\nThe voice came again. Same whisper. Same nonsense:\n\n\"Bubble gum explosion… at 2:17... bring cheese.\"\n\nEllie slowly backed away from the sunglasses cactus. Maybe it was a prank. Maybe someone was hiding behind the ferns. Maybe the cheese lobby had gone too far this time.\n\n[Continue reading to discover the Whisper Club's amazing adventure...]",
+                fullContent: `[Full book content would be stored here - using the complete text from the document]`
             },
             {
                 title: "Life of a Smashkarts Hero",
@@ -1457,16 +1561,19 @@
                 state = { ...state, ...loaded };
             }
             
-            const savedBooks = localStorage.getItem('randomParkBooks_books');
+            // Load global books (shared across all users)
+            const savedBooks = localStorage.getItem('randomParkBooks_globalBooks');
             if (savedBooks) {
                 books = JSON.parse(savedBooks);
             }
             
+            // Load global orders (accessible by Unown S)
             const savedGlobalOrders = localStorage.getItem('randomParkBooks_globalOrders');
             if (savedGlobalOrders) {
                 globalOrders = JSON.parse(savedGlobalOrders);
             }
             
+            // Load global delivered books
             const savedGlobalDeliveredBooks = localStorage.getItem('randomParkBooks_globalDeliveredBooks');
             if (savedGlobalDeliveredBooks) {
                 globalDeliveredBooks = JSON.parse(savedGlobalDeliveredBooks);
@@ -1476,7 +1583,8 @@
         // Save state
         function saveState() {
             localStorage.setItem('randomParkBooks', JSON.stringify(state));
-            localStorage.setItem('randomParkBooks_books', JSON.stringify(books));
+            // Save books globally so all users see the same catalog
+            localStorage.setItem('randomParkBooks_globalBooks', JSON.stringify(books));
             localStorage.setItem('randomParkBooks_globalOrders', JSON.stringify(globalOrders));
             localStorage.setItem('randomParkBooks_globalDeliveredBooks', JSON.stringify(globalDeliveredBooks));
         }
@@ -1499,12 +1607,12 @@
             const lastName = document.getElementById('lastName').value.trim();
             
             if (!firstName || !lastName) {
-                showNotification('❌ Please enter your first and last name!');
+                showNotification('❌ Please enter your first and last name!', 'error');
                 return;
             }
             
             if (!isAuthorizedUser(firstName, lastName)) {
-                showNotification('❌ You are not authorized to access this store!');
+                showNotification('❌ You are not authorized to access this store!', 'error');
                 return;
             }
             
@@ -1513,14 +1621,14 @@
                 // Require admin password for Unown S
                 const password = prompt('🔐 Admin password required for Unown S:');
                 if (password !== ADMIN_PASSWORD) {
-                    showNotification('❌ Incorrect admin password!');
+                    showNotification('❌ Incorrect admin password!', 'error');
                     return;
                 }
             }
             
             // Check if user is already logged in
             if (isUserLoggedIn(firstName, lastName)) {
-                showNotification('❌ This user is already logged in! Only one session allowed per user.');
+                showNotification('❌ This user is already logged in! Only one session allowed per user.', 'error');
                 return;
             }
             
@@ -1544,7 +1652,9 @@
             saveState();
             
             if (state.isSpecialAdmin) {
-                showNotification('👑 Welcome, Unown S! You can view all customer orders.');
+                showNotification('👑 Welcome, Unown S! You can view all customer orders.', 'success');
+            } else {
+                showNotification(`👋 Welcome back, ${firstName}!`, 'success');
             }
         }
 
@@ -1573,7 +1683,9 @@
                 isSpecialAdmin: false,
                 firstName: '',
                 lastName: '',
-                deliveredBooks: []
+                deliveredBooks: [],
+                rewardPoints: 0,
+                redeemedRewards: []
             };
             
             // Reset form
@@ -1682,16 +1794,17 @@
                 price: price
             });
             
-            showNotification(`✅ Added "${book.title}" (${type}) to cart!`);
+            showNotification(`✅ Added "${book.title}" (${type}) to cart!`, 'success');
             updateDisplay();
-            saveState();
+            triggerAutoSave();
         }
 
         function removeFromCart(index) {
+            const item = state.cart[index];
             state.cart.splice(index, 1);
             updateDisplay();
-            saveState();
-            showNotification('🗑️ Item removed from cart');
+            triggerAutoSave();
+            showNotification(`🗑️ Removed "${item.title}" from cart`, 'info');
         }
 
         function showPreview(index) {
@@ -1756,7 +1869,6 @@
             if (state.cart.length === 0) return;
             
             document.getElementById('checkoutName').value = state.name;
-            document.getElementById('checkoutEmail').value = state.email;
             
             const summary = state.cart.map(item => 
                 `<div style="padding: 8px 0; border-bottom: 1px solid #ddd;">
@@ -1777,6 +1889,12 @@
         function confirmOrder() {
             const notes = document.getElementById('checkoutNotes').value;
             
+            // Validate cart isn't empty
+            if (state.cart.length === 0) {
+                showNotification('❌ Your cart is empty!', 'error');
+                return;
+            }
+            
             // Create order
             const order = {
                 id: Date.now(),
@@ -1793,7 +1911,11 @@
             // Add to global orders for Unown S to view
             globalOrders.push(order);
             
-            // Move cart items to orders
+            // Award reward points (10 points per dollar spent)
+            const pointsEarned = Math.floor(order.total * 10);
+            state.rewardPoints += pointsEarned;
+            
+            // Move cart items to orders and update sales
             state.cart.forEach(item => {
                 const book = books.find(b => b.title === item.title);
                 if (book) book.sales++;
@@ -1805,13 +1927,11 @@
             saveState();
             closeCheckout();
             
-            showNotification('✅ Order confirmed! Check your email for confirmation.');
-            
-            // Simulate email (in real app, this would be sent to backend)
-            console.log('Order Email:', order);
+            showNotification(`✅ Order confirmed! You earned ${pointsEarned} reward points! 🎁`, 'success');
             
             updateDisplay();
             renderBooks();
+            updateAchievements();
         }
 
         function closeCheckout() {
@@ -1821,6 +1941,7 @@
         // Profile Functions
         function showProfile() {
             document.getElementById('profileName').value = state.name;
+            document.getElementById('profileRewardPoints').textContent = state.rewardPoints;
             
             // Show appropriate orders based on user type
             const ordersToShow = state.isSpecialAdmin ? globalOrders : state.orders;
@@ -1863,6 +1984,33 @@
                 `).join('');
             }
             
+            // Check if user has delivered books
+            const userDeliveredBooks = globalDeliveredBooks.filter(book => 
+                book.customerName.toLowerCase() === state.name.toLowerCase()
+            );
+            
+            const deliveredBooksSection = document.getElementById('deliveredBooksSection');
+            const deliveredBooksList = document.getElementById('profileDeliveredBooks');
+            
+            if (userDeliveredBooks.length > 0) {
+                deliveredBooksSection.style.display = 'block';
+                deliveredBooksList.innerHTML = userDeliveredBooks.map(book => `
+                    <div class="admin-book-item" style="margin-top: 15px; background: linear-gradient(135deg, #43e97b22 0%, #38f9d722 100%); border: 2px solid #43e97b;">
+                        <div>
+                            <h4>📖 ${book.bookTitle}</h4>
+                            <p style="color: #666; margin: 5px 0;">
+                                <strong>Delivered:</strong> ${book.date}
+                            </p>
+                            <button class="checkout-btn" style="margin-top: 10px; padding: 10px 20px;" onclick="readDeliveredBook('${book.id}')">
+                                📚 Read Book
+                            </button>
+                        </div>
+                    </div>
+                `).join('');
+            } else {
+                deliveredBooksSection.style.display = 'none';
+            }
+            
             // Highlight current avatar
             document.querySelectorAll('#profileModal .avatar-btn').forEach(btn => {
                 btn.classList.remove('selected');
@@ -1885,15 +2033,37 @@
             document.getElementById('profileModal').style.display = 'block';
         }
 
+        function readDeliveredBook(bookId) {
+            const book = globalDeliveredBooks.find(b => b.id == bookId);
+            if (!book) {
+                showNotification('❌ Book not found!', 'error');
+                return;
+            }
+            
+            document.getElementById('readerBookTitle').textContent = book.bookTitle;
+            document.getElementById('readerBookContent').textContent = book.bookContent;
+            document.getElementById('bookReaderModal').style.display = 'block';
+            
+            // Close profile modal
+            closeProfile();
+            
+            showNotification('📖 Enjoy your book!', 'success');
+        }
+
         function closeProfile() {
             document.getElementById('profileModal').style.display = 'none';
         }
 
         function updateProfile() {
-            state.name = document.getElementById('profileName').value;
+            const newName = document.getElementById('profileName').value.trim();
+            if (!newName) {
+                showNotification('❌ Name cannot be empty!', 'error');
+                return;
+            }
+            state.name = newName;
             document.getElementById('displayName').textContent = state.name;
             saveState();
-            showNotification('✅ Profile updated!');
+            showNotification('✅ Profile updated!', 'success');
         }
 
         function updateAvatar(btn, emoji) {
@@ -1902,7 +2072,7 @@
             state.avatar = emoji;
             document.getElementById('userAvatar').textContent = emoji;
             saveState();
-            showNotification('✅ Avatar updated!');
+            showNotification('✅ Avatar updated!', 'success');
             updateAchievements();
         }
 
@@ -1912,7 +2082,7 @@
             state.theme = theme;
             applyTheme();
             saveState();
-            showNotification('✅ Theme updated!');
+            showNotification('✅ Theme updated!', 'success');
             updateAchievements();
         }
 
@@ -1938,6 +2108,68 @@
             document.getElementById('achievementsModal').style.display = 'none';
         }
 
+        // Rewards Functions
+        function showRewards() {
+            document.getElementById('rewardPoints').textContent = state.rewardPoints;
+            
+            const list = document.getElementById('rewardsList');
+            list.innerHTML = rewardsList.map(reward => {
+                const redeemed = state.redeemedRewards.includes(reward.id);
+                const canAfford = state.rewardPoints >= reward.cost;
+                
+                return `
+                    <div class="achievement ${redeemed ? 'unlocked' : ''}">
+                        <div class="achievement-icon">${reward.icon}</div>
+                        <div class="achievement-title">${reward.title}</div>
+                        <div class="achievement-desc">${reward.desc}</div>
+                        <div style="margin-top: 10px; font-weight: bold; font-size: 18px;">
+                            ${reward.cost} Points
+                        </div>
+                        ${redeemed ? 
+                            '<div style="margin-top: 10px; font-weight: bold;">✅ Redeemed</div>' : 
+                            `<button class="buy-btn add-ebook" style="margin-top: 10px; padding: 8px 16px; ${!canAfford ? 'opacity: 0.5; cursor: not-allowed;' : ''}" 
+                                onclick="redeemReward('${reward.id}')" 
+                                ${!canAfford ? 'disabled' : ''}>
+                                ${canAfford ? '🎁 Redeem' : '🔒 Locked'}
+                            </button>`
+                        }
+                    </div>
+                `;
+            }).join('');
+            
+            document.getElementById('rewardsModal').style.display = 'block';
+        }
+
+        function closeRewards() {
+            document.getElementById('rewardsModal').style.display = 'none';
+        }
+
+        function redeemReward(rewardId) {
+            const reward = rewardsList.find(r => r.id === rewardId);
+            
+            if (!reward) return;
+            
+            if (state.rewardPoints < reward.cost) {
+                showNotification('❌ Not enough points!', 'error');
+                return;
+            }
+            
+            if (state.redeemedRewards.includes(rewardId)) {
+                showNotification('❌ Already redeemed!', 'error');
+                return;
+            }
+            
+            if (!confirm(`Redeem "${reward.title}" for ${reward.cost} points?`)) return;
+            
+            state.rewardPoints -= reward.cost;
+            state.redeemedRewards.push(rewardId);
+            
+            saveState();
+            showRewards(); // Refresh the rewards display
+            
+            showNotification(`🎉 Successfully redeemed: ${reward.title}!`, 'success');
+        }
+
         // Admin Functions
         function openAdminLogin() {
             document.getElementById('adminPassword').value = '';
@@ -1954,9 +2186,9 @@
             if (password === ADMIN_PASSWORD) {
                 closeAdminLogin();
                 openAdminPanel();
-                showNotification('✅ Welcome, Admin!');
+                showNotification('✅ Welcome, Admin!', 'success');
             } else {
-                showNotification('❌ Incorrect password!');
+                showNotification('❌ Incorrect password!', 'error');
                 setTimeout(() => {
                     closeAdminLogin();
                 }, 2000);
@@ -2001,25 +2233,36 @@
         function deliverBookToCustomer() {
             const customerName = document.getElementById('deliverCustomerName').value.trim();
             const bookIndex = document.getElementById('deliverBookSelect').value;
+            const bookContent = document.getElementById('deliverBookContent').value.trim();
             
             if (!customerName) {
-                showNotification('❌ Please enter a customer name!');
+                showNotification('❌ Please enter a customer name!', 'error');
                 return;
             }
             
             if (bookIndex === '') {
-                showNotification('❌ Please select a book!');
+                showNotification('❌ Please select a book!', 'error');
+                return;
+            }
+            
+            if (!bookContent) {
+                showNotification('❌ Please enter the book content!', 'error');
+                return;
+            }
+            
+            // Validate content length
+            if (!validateBookContent(bookContent)) {
                 return;
             }
             
             const book = books[parseInt(bookIndex)];
             
-            // Create delivered book record
+            // Create delivered book record with full content
             const deliveredBook = {
                 id: Date.now(),
                 customerName: customerName,
                 bookTitle: book.title,
-                bookContent: book.preview,
+                bookContent: bookContent,
                 date: new Date().toLocaleString()
             };
             
@@ -2029,8 +2272,9 @@
             // Clear form
             document.getElementById('deliverCustomerName').value = '';
             document.getElementById('deliverBookSelect').value = '';
+            document.getElementById('deliverBookContent').value = '';
             
-            showNotification(`✅ "${book.title}" delivered to ${customerName}!`);
+            showNotification(`✅ "${book.title}" delivered to ${customerName}!`, 'success');
         }
         
         function readBook(bookTitle) {
@@ -2082,7 +2326,17 @@
             const preview = document.getElementById('newBookPreview').value.trim();
             
             if (!title || !preview) {
-                showNotification('❌ Please fill in title and preview!');
+                showNotification('❌ Please fill in title and preview!', 'error');
+                return;
+            }
+            
+            if (isNaN(ebook) || isNaN(physical) || ebook < 0 || physical < 0) {
+                showNotification('❌ Please enter valid prices!', 'error');
+                return;
+            }
+            
+            if (rating < 0 || rating > 5) {
+                showNotification('❌ Rating must be between 0 and 5!', 'error');
                 return;
             }
             
@@ -2099,7 +2353,7 @@
             
             saveState();
             renderBooks();
-            showNotification('✅ Book added successfully!');
+            showNotification('✅ Book added successfully!', 'success');
             
             // Clear form
             document.getElementById('newBookTitle').value = '';
@@ -2133,17 +2387,18 @@
             const addTab = document.querySelectorAll('.admin-tab')[1];
             addTab.click();
             
-            showNotification('✏️ Edit mode - Update and click Add Book');
+            showNotification('✏️ Edit mode - Update and click Add Book', 'info');
         }
 
         function deleteBook(index) {
-            if (!confirm('Are you sure you want to delete this book?')) return;
+            const book = books[index];
+            if (!confirm(`Are you sure you want to delete "${book.title}"?`)) return;
             
             books.splice(index, 1);
             saveState();
             renderBooks();
             loadAdminBooks();
-            showNotification('🗑️ Book deleted successfully!');
+            showNotification(`🗑️ "${book.title}" deleted successfully!`, 'success');
         }
 
         function loadAdminOrders() {
@@ -2186,13 +2441,84 @@
             }
         }
 
-        function showNotification(msg) {
+        function showNotification(msg, type = 'default') {
             const notif = document.getElementById('notification');
             notif.textContent = msg;
+            
+            // Remove all type classes
+            notif.classList.remove('success', 'error', 'info');
+            
+            // Add appropriate class based on type
+            if (type === 'success') notif.classList.add('success');
+            else if (type === 'error') notif.classList.add('error');
+            else if (type === 'info') notif.classList.add('info');
+            
             notif.style.display = 'block';
             setTimeout(() => {
                 notif.style.display = 'none';
             }, 3500);
+        }
+
+        // Add keyboard shortcuts
+        document.addEventListener('keydown', function(e) {
+            // Escape key closes modals
+            if (e.key === 'Escape') {
+                closePreview();
+                closeProfile();
+                closeAchievements();
+                closeRewards();
+                closeAdminLogin();
+                closeAdminPanel();
+                closeCheckout();
+                closeBookReader();
+            }
+            
+            // Ctrl/Cmd + K to open search
+            if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+                e.preventDefault();
+                document.getElementById('searchBox')?.focus();
+            }
+        });
+
+        // Add loading state to buttons
+        function setButtonLoading(buttonId, isLoading) {
+            const button = document.getElementById(buttonId);
+            if (!button) return;
+            
+            if (isLoading) {
+                button.disabled = true;
+                button.innerHTML = '<span class="loading-spinner"></span> Loading...';
+            } else {
+                button.disabled = false;
+            }
+        }
+
+        // Validate book content length
+        function validateBookContent(content) {
+            const wordCount = content.trim().split(/\s+/).length;
+            if (wordCount > 10000000) {
+                showNotification('❌ Content exceeds 10 million words!', 'error');
+                return false;
+            }
+            return true;
+        }
+
+        // Add confirmation before leaving with unsaved cart
+        window.addEventListener('beforeunload', function(e) {
+            if (state.cart && state.cart.length > 0) {
+                e.preventDefault();
+                e.returnValue = 'You have items in your cart. Are you sure you want to leave?';
+                return e.returnValue;
+            }
+        });
+
+        // Auto-save functionality
+        let autoSaveTimer;
+        function triggerAutoSave() {
+            clearTimeout(autoSaveTimer);
+            autoSaveTimer = setTimeout(() => {
+                saveState();
+            }, 1000); // Save after 1 second of inactivity
         }
 
         // Initialize
