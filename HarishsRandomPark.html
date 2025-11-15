@@ -1,1629 +1,2698 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { initializeApp, FirebaseApp } from 'firebase/app';
-import { getDatabase, ref, set, onValue, remove, Database } from 'firebase/database';
-
-// Types
-interface Book {
-  id: string;
-  title: string;
-  ebook: number;
-  physical: number;
-  rating: number;
-  sales: number;
-  preview: string;
-  badge?: string;
-  popular?: boolean;
-  fullContent?: string;
-}
-
-interface CartItem {
-  title: string;
-  type: 'ebook' | 'physical';
-  price: number;
-}
-
-interface Order {
-  id: number;
-  name: string;
-  email: string;
-  items: CartItem[];
-  notes: string;
-  date: string;
-  total: number;
-}
-
-interface DeliveredBook {
-  id: number;
-  customerName: string;
-  bookTitle: string;
-  bookContent: string;
-  date: string;
-}
-
-interface UserData {
-  userId: string;
-  name: string;
-  email: string;
-  avatar: string;
-  theme: ThemeType;
-  cart: CartItem[];
-  orders: Order[];
-  achievements: string[];
-  rewardPoints: number;
-  redeemedRewards: string[];
-  firstName: string;
-  lastName: string;
-  isSpecialAdmin: boolean;
-}
-
-interface Achievement {
-  id: string;
-  icon: string;
-  title: string;
-  desc: string;
-  condition: () => boolean;
-}
-
-interface Reward {
-  id: string;
-  icon: string;
-  title: string;
-  desc: string;
-  cost: number;
-  type: string;
-}
-
-interface Session {
-  firstName: string;
-  lastName: string;
-  loginTime: number;
-}
-
-interface AuthUser {
-  first: string;
-  last: string;
-}
-
-type ThemeType = 'purple' | 'blue' | 'pink' | 'green' | 'orange' | 'teal';
-type FilterType = 'all' | 'ebook' | 'physical' | 'popular';
-type AdminTab = 'books' | 'add' | 'orders';
-
-// Firebase Configuration
-const firebaseConfig = {
-  apiKey: "AIzaSyBxM7Q_example_your_api_key_here",
-  authDomain: "random-park-books.firebaseapp.com",
-  databaseURL: "https://random-park-books-default-rtdb.firebaseio.com",
-  projectId: "random-park-books",
-  storageBucket: "random-park-books.appspot.com",
-  messagingSenderId: "123456789",
-  appId: "1:123456789:web:example"
-};
-
-// Constants
-const ADMIN_PASSWORD = atob('ZXVyZWth');
-
-const AUTHORIZED_USERS: AuthUser[] = [
-  { first: 'Unown', last: 'S' },
-  { first: 'Anne', last: 'Bell' },
-  { first: 'Cameron', last: 'Hughes' },
-  { first: 'Sophie', last: 'Lambert' },
-  { first: 'Evan', last: 'Morrison' },
-  { first: 'Christian', last: 'Dyer' },
-  { first: 'Nathan', last: 'Marshall' },
-  { first: 'Sebastian', last: 'Graham' },
-  { first: 'Evan', last: 'Henderson' },
-  { first: 'Brandon', last: 'Clark' },
-  { first: 'Carolyn', last: 'Clarkson' },
-  { first: 'Ian', last: 'Fraser' },
-  { first: 'Keith', last: 'Hart' },
-  { first: 'Gabrielle', last: 'Hamilton' },
-  { first: 'Nicola', last: 'Jackson' },
-  { first: 'Joan', last: 'Randall' },
-  { first: 'Alison', last: 'McLean' },
-  { first: 'Irene', last: 'Hudson' },
-  { first: 'Julia', last: 'Ogden' },
-  { first: 'Jason', last: 'Piper' },
-  { first: 'Julian', last: 'Berry' },
-  { first: 'Pippa', last: 'Roberts' },
-  { first: 'Bella', last: 'Davies' },
-  { first: 'Carolyn', last: 'Fisher' },
-  { first: 'Anne', last: 'Clark' },
-  { first: 'Matt', last: 'Gray' },
-  { first: 'Victor', last: 'Bell' },
-  { first: 'Rachel', last: 'Jackson' },
-  { first: 'Jan', last: 'Vaughan' },
-  { first: 'John', last: 'Ball' },
-  { first: 'Phil', last: 'Cameron' }
-];
-
-const THEMES: Record<ThemeType, { p: string; s: string }> = {
-  purple: { p: '#667eea', s: '#764ba2' },
-  blue: { p: '#4facfe', s: '#00f2fe' },
-  pink: { p: '#f093fb', s: '#f5576c' },
-  green: { p: '#43e97b', s: '#38f9d7' },
-  orange: { p: '#fa709a', s: '#fee140' },
-  teal: { p: '#30cfd0', s: '#330867' }
-};
-
-const DEFAULT_BOOKS: Book[] = [
-  {
-    id: 'book1',
-    title: "Wacky Whispers",
-    ebook: 4,
-    physical: 7,
-    rating: 4.5,
-    sales: 145,
-    preview: "Chapter 1: \"Did That Cactus Just Whisper at Me?\"\n\nEllie Voss had been banned from three cactus stores in her town..."
-  },
-  {
-    id: 'book2',
-    title: "Life of a Smashkarts Hero",
-    ebook: 3,
-    physical: 6,
-    rating: 4.8,
-    sales: 289,
-    popular: true,
-    preview: "Uggh! Is this how it feels to be in a game! I wish I was back in the customizer..."
-  },
-  {
-    id: 'book3',
-    title: "Life of a Ragdoll Hero",
-    ebook: 3,
-    physical: 6,
-    rating: 4.6,
-    sales: 178,
-    preview: "Ragdoll, a person in the game of stickman clash, was living life..."
-  },
-  {
-    id: 'book4',
-    title: "Adventures of Maple and the Sky Kingdom",
-    ebook: 6,
-    physical: 9,
-    rating: 5.0,
-    sales: 412,
-    popular: true,
-    badge: "BESTSELLER",
-    preview: "Maple Thistlewhip was not supposed to be in the attic..."
-  },
-  {
-    id: 'book5',
-    title: "The Great Sandwich Mystery",
-    ebook: 6,
-    physical: 9,
-    rating: 4.7,
-    sales: 234,
-    preview: "Timmy the raccoon opened his lunchbox with ultimate excitement..."
-  },
-  {
-    id: 'book6',
-    title: "Puppet Hockey Hero",
-    ebook: 4,
-    physical: 7,
-    rating: 4.4,
-    sales: 167,
-    preview: "It was the last day of Puppet School, it was the day we were graduating..."
-  },
-  {
-    id: 'book7',
-    title: "Silent Echoes",
-    ebook: 4,
-    physical: 7,
-    rating: 4.9,
-    sales: 198,
-    preview: "The small town of Haven's End had never encountered anything remotely like the vast, shimmering dome..."
-  }
-];
-
-// Utility Functions
-const isSpecialAdmin = (firstName: string, lastName: string): boolean => {
-  return firstName.toLowerCase() === 'unown' && lastName.toLowerCase() === 's';
-};
-
-const isAuthorizedUser = (firstName: string, lastName: string): boolean => {
-  return AUTHORIZED_USERS.some(user => 
-    user.first.toLowerCase() === firstName.toLowerCase() && 
-    user.last.toLowerCase() === lastName.toLowerCase()
-  );
-};
-
-export default function RandomParkBooks() {
-  // State
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [userData, setUserData] = useState<UserData>({
-    userId: '',
-    name: '',
-    email: '',
-    avatar: '😊',
-    theme: 'purple',
-    cart: [],
-    orders: [],
-    achievements: [],
-    rewardPoints: 0,
-    redeemedRewards: [],
-    firstName: '',
-    lastName: '',
-    isSpecialAdmin: false
-  });
-
-  const [books, setBooks] = useState<Book[]>([]);
-  const [globalOrders, setGlobalOrders] = useState<Order[]>([]);
-  const [deliveredBooks, setDeliveredBooks] = useState<DeliveredBook[]>([]);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [currentFilter, setCurrentFilter] = useState<FilterType>('all');
-  
-  // Modal states
-  const [showPreview, setShowPreview] = useState(false);
-  const [previewBook, setPreviewBook] = useState<Book | null>(null);
-  const [showProfile, setShowProfile] = useState(false);
-  const [showAchievements, setShowAchievements] = useState(false);
-  const [showRewards, setShowRewards] = useState(false);
-  const [showAdminLogin, setShowAdminLogin] = useState(false);
-  const [showAdminPanel, setShowAdminPanel] = useState(false);
-  const [showCheckout, setShowCheckout] = useState(false);
-  const [showBookReader, setShowBookReader] = useState(false);
-  const [currentReadingBook, setCurrentReadingBook] = useState<DeliveredBook | null>(null);
-  
-  // Admin state
-  const [adminTab, setAdminTab] = useState<AdminTab>('books');
-  const [adminPassword, setAdminPassword] = useState('');
-  
-  // Form states
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
-  const [selectedAvatar, setSelectedAvatar] = useState('😊');
-  const [selectedTheme, setSelectedTheme] = useState<ThemeType>('purple');
-  const [checkoutNotes, setCheckoutNotes] = useState('');
-  
-  // New book form
-  const [newBook, setNewBook] = useState({
-    title: '',
-    ebook: 5,
-    physical: 10,
-    rating: 4.5,
-    sales: 0,
-    badge: '',
-    popular: false,
-    preview: ''
-  });
-  
-  // Deliver book form
-  const [deliverForm, setDeliverForm] = useState({
-    customerName: '',
-    bookIndex: '',
-    content: ''
-  });
-
-  // Notification
-  const [notification, setNotification] = useState<{
-    show: boolean;
-    message: string;
-    type: 'success' | 'error' | 'info' | 'default';
-  }>({ show: false, message: '', type: 'default' });
-
-  // Firebase
-  const [db, setDb] = useState<Database | null>(null);
-  const [firebaseInitialized, setFirebaseInitialized] = useState(false);
-
-  // Initialize Firebase
-  useEffect(() => {
-    try {
-      const app = initializeApp(firebaseConfig);
-      const database = getDatabase(app);
-      setDb(database);
-      setFirebaseInitialized(true);
-      console.log('✅ Firebase initialized');
-    } catch (error) {
-      console.error('Firebase init error:', error);
-      showNotificationMsg('⚠️ Running in offline mode', 'info');
-      loadLocalData();
-    }
-  }, []);
-
-  // Setup Firebase listeners
-  useEffect(() => {
-    if (!db || !firebaseInitialized) return;
-
-    const booksRef = ref(db, 'books');
-    const ordersRef = ref(db, 'orders');
-    const deliveredBooksRef = ref(db, 'deliveredBooks');
-
-    const unsubscribeBooks = onValue(booksRef, (snapshot) => {
-      const data = snapshot.val();
-      if (data) {
-        setBooks(Object.values(data));
-      } else {
-        initializeDefaultBooks();
-      }
-    });
-
-    const unsubscribeOrders = onValue(ordersRef, (snapshot) => {
-      const data = snapshot.val();
-      setGlobalOrders(data ? Object.values(data) : []);
-    });
-
-    const unsubscribeDelivered = onValue(deliveredBooksRef, (snapshot) => {
-      const data = snapshot.val();
-      setDeliveredBooks(data ? Object.values(data) : []);
-    });
-
-    return () => {
-      unsubscribeBooks();
-      unsubscribeOrders();
-      unsubscribeDelivered();
-    };
-  }, [db, firebaseInitialized]);
-
-  const initializeDefaultBooks = () => {
-    if (db) {
-      DEFAULT_BOOKS.forEach(book => {
-        set(ref(db, 'books/' + book.id), book);
-      });
-    } else {
-      setBooks(DEFAULT_BOOKS);
-      saveLocalData();
-    }
-  };
-
-  const loadLocalData = () => {
-    const saved = localStorage.getItem('randomParkBooks_local');
-    if (saved) {
-      const loaded = JSON.parse(saved);
-      setBooks(loaded.books || []);
-      setGlobalOrders(loaded.orders || []);
-      setDeliveredBooks(loaded.deliveredBooks || []);
-    }
-    if (books.length === 0) {
-      setBooks(DEFAULT_BOOKS);
-    }
-  };
-
-  const saveLocalData = () => {
-    localStorage.setItem('randomParkBooks_local', JSON.stringify({
-      books,
-      orders: globalOrders,
-      deliveredBooks
-    }));
-  };
-
-  const showNotificationMsg = (message: string, type: 'success' | 'error' | 'info' | 'default' = 'default') => {
-    setNotification({ show: true, message, type });
-    setTimeout(() => {
-      setNotification(prev => ({ ...prev, show: false }));
-    }, 3500);
-  };
-
-  const checkActiveSession = async (first: string, last: string): Promise<boolean> => {
-    const sessionKey = `${first.toLowerCase()}_${last.toLowerCase()}`;
-    if (db) {
-      try {
-        const snapshot = await new Promise<any>((resolve) => {
-          onValue(ref(db, 'activeSessions/' + sessionKey), resolve, { onlyOnce: true });
-        });
-        return snapshot.val() !== null;
-      } catch (error) {
-        console.error('Session check error:', error);
-        return false;
-      }
-    }
-    return false;
-  };
-
-  const createSession = async (first: string, last: string) => {
-    const sessionKey = `${first.toLowerCase()}_${last.toLowerCase()}`;
-    if (db) {
-      try {
-        await set(ref(db, 'activeSessions/' + sessionKey), {
-          firstName: first,
-          lastName: last,
-          loginTime: Date.now()
-        });
-      } catch (error) {
-        console.error('Session creation error:', error);
-      }
-    }
-  };
-
-  const removeSession = async (first: string, last: string) => {
-    const sessionKey = `${first.toLowerCase()}_${last.toLowerCase()}`;
-    if (db) {
-      try {
-        await remove(ref(db, 'activeSessions/' + sessionKey));
-      } catch (error) {
-        console.error('Session removal error:', error);
-      }
-    }
-  };
-
-  const handleLogin = async () => {
-    if (!firstName.trim() || !lastName.trim()) {
-      showNotificationMsg('❌ Please enter your first and last name!', 'error');
-      return;
-    }
-
-    if (!isAuthorizedUser(firstName, lastName)) {
-      showNotificationMsg('❌ You are not authorized to access this store!', 'error');
-      return;
-    }
-
-    if (isSpecialAdmin(firstName, lastName)) {
-      const password = prompt('🔐 Admin password required for Unown S:');
-      if (password !== ADMIN_PASSWORD) {
-        showNotificationMsg('❌ Incorrect admin password!', 'error');
-        return;
-      }
-    }
-
-    const hasActiveSession = await checkActiveSession(firstName, lastName);
-    if (hasActiveSession) {
-      showNotificationMsg('❌ This user is already logged in!', 'error');
-      return;
-    }
-
-    const userId = `${firstName.toLowerCase()}_${lastName.toLowerCase()}`;
-    const newUserData: UserData = {
-      userId,
-      name: `${firstName} ${lastName}`,
-      email: `${firstName.toLowerCase()}.${lastName.toLowerCase()}@randomparkbooks.com`,
-      avatar: selectedAvatar,
-      theme: selectedTheme,
-      cart: [],
-      orders: [],
-      achievements: [],
-      rewardPoints: 0,
-      redeemedRewards: [],
-      firstName,
-      lastName,
-      isSpecialAdmin: isSpecialAdmin(firstName, lastName)
-    };
-
-    await createSession(firstName, lastName);
-    setUserData(newUserData);
-    setIsLoggedIn(true);
-
-    showNotificationMsg(
-      newUserData.isSpecialAdmin 
-        ? '👑 Welcome, Unown S! Real-time sync active.' 
-        : `👋 Welcome, ${firstName}! Real-time sync active.`,
-      'success'
-    );
-  };
-
-  const handleLogout = async () => {
-    if (!window.confirm('Are you sure you want to logout?')) return;
-
-    await removeSession(userData.firstName, userData.lastName);
-    setIsLoggedIn(false);
-    setUserData({
-      userId: '',
-      name: '',
-      email: '',
-      avatar: '😊',
-      theme: 'purple',
-      cart: [],
-      orders: [],
-      achievements: [],
-      rewardPoints: 0,
-      redeemedRewards: [],
-      firstName: '',
-      lastName: '',
-      isSpecialAdmin: false
-    });
-    setFirstName('');
-    setLastName('');
-    setSelectedAvatar('😊');
-    setSelectedTheme('purple');
-
-    showNotificationMsg('👋 Logged out successfully!', 'success');
-  };
-
-  const addToCart = (book: Book, type: 'ebook' | 'physical') => {
-    const price = type === 'ebook' ? book.ebook : book.physical;
-    const newCart = [...userData.cart, { title: book.title, type, price }];
-    setUserData(prev => ({ ...prev, cart: newCart }));
-    showNotificationMsg(`✅ Added "${book.title}" (${type}) to cart!`, 'success');
-  };
-
-  const removeFromCart = (index: number) => {
-    const item = userData.cart[index];
-    const newCart = userData.cart.filter((_, i) => i !== index);
-    setUserData(prev => ({ ...prev, cart: newCart }));
-    showNotificationMsg(`🗑️ Removed "${item.title}" from cart`, 'info');
-  };
-
-  const handleCheckout = async () => {
-    if (userData.cart.length === 0) {
-      showNotificationMsg('❌ Your cart is empty!', 'error');
-      return;
-    }
-
-    const order: Order = {
-      id: Date.now(),
-      name: userData.name,
-      email: userData.email,
-      items: [...userData.cart],
-      notes: checkoutNotes,
-      date: new Date().toLocaleString(),
-      total: userData.cart.reduce((sum, item) => sum + item.price, 0)
-    };
-
-    const newOrders = [...userData.orders, order];
-    const pointsEarned = Math.floor(order.total * 10);
-    const newRewardPoints = userData.rewardPoints + pointsEarned;
-
-    if (db) {
-      try {
-        await set(ref(db, 'orders/' + order.id), order);
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Random Park Books - Buy Books Online</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
         
-        // Update book sales
-        for (const item of userData.cart) {
-          const book = books.find(b => b.title === item.title);
-          if (book) {
-            await set(ref(db, 'books/' + book.id + '/sales'), book.sales + 1);
-          }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
         }
-      } catch (error) {
-        console.error('Checkout error:', error);
-      }
-    }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        /* Welcome Screen */
+        .welcome-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            z-index: 3000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            animation: fadeIn 0.5s;
+        }
+        
+        .welcome-box {
+            background: white;
+            padding: 50px;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 500px;
+            width: 90%;
+            text-align: center;
+            animation: slideUp 0.6s;
+        }
+        
+        @keyframes slideUp {
+            from { transform: translateY(50px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        .welcome-icon {
+            font-size: 64px;
+            margin-bottom: 20px;
+            animation: bounce 2s infinite;
+        }
+        
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+        
+        .welcome-box h1 {
+            color: #667eea;
+            margin-bottom: 30px;
+            font-size: 32px;
+        }
+        
+        .login-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+        
+        .form-group {
+            margin-bottom: 15px;
+            text-align: left;
+        }
 
-    setUserData(prev => ({
-      ...prev,
-      cart: [],
-      orders: newOrders,
-      rewardPoints: newRewardPoints
-    }));
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            color: #333;
+            font-weight: 600;
+            font-size: 14px;
+        }
 
-    setShowCheckout(false);
-    setCheckoutNotes('');
-    showNotificationMsg(`✅ Order confirmed! You earned ${pointsEarned} reward points! 🎁`, 'success');
-  };
+        .form-group input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
 
-  const filteredBooks = books.filter(book => {
-    const matchesSearch = book.title.toLowerCase().includes(searchQuery.toLowerCase());
-    if (!matchesSearch) return false;
+        .form-group input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
 
-    if (currentFilter === 'all') return true;
-    if (currentFilter === 'popular') return book.popular;
-    return true;
-  });
+        .form-group textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: all 0.3s;
+            font-family: inherit;
+            resize: vertical;
+        }
 
-  const achievements: Achievement[] = [
-    { id: 'first_book', icon: '📖', title: 'First Purchase', desc: 'Buy your first book', condition: () => userData.orders.length >= 1 },
-    { id: 'book_lover', icon: '📚', title: 'Book Lover', desc: 'Purchase 5 books', condition: () => userData.orders.length >= 5 },
-    { id: 'collector', icon: '🎯', title: 'Collector', desc: 'Purchase 10 books', condition: () => userData.orders.length >= 10 },
-    { id: 'digital_fan', icon: '💻', title: 'Digital Fan', desc: 'Buy 3 eBooks', condition: () => userData.orders.filter(o => o.items.some(i => i.type === 'ebook')).length >= 3 },
-    { id: 'physical_fan', icon: '📕', title: 'Physical Fan', desc: 'Buy 3 physical books', condition: () => userData.orders.filter(o => o.items.some(i => i.type === 'physical')).length >= 3 },
-    { id: 'explorer', icon: '🗺️', title: 'Explorer', desc: 'Try both eBooks and physical', condition: () => userData.orders.some(o => o.items.some(i => i.type === 'ebook')) && userData.orders.some(o => o.items.some(i => i.type === 'physical')) },
-    { id: 'bestseller_fan', icon: '🔥', title: 'Bestseller Fan', desc: 'Buy a bestseller book', condition: () => userData.orders.some(o => o.items.some(item => books.find(b => b.title === item.title && b.badge === 'BESTSELLER'))) },
-    { id: 'customizer', icon: '🎨', title: 'Customizer', desc: 'Change your profile settings', condition: () => userData.avatar !== '😊' || userData.theme !== 'purple' }
-  ];
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        
+        .customize-section {
+            margin-top: 25px;
+            padding-top: 25px;
+            border-top: 2px solid #f0f0f0;
+        }
+        
+        .customize-section h3 {
+            color: #667eea;
+            margin-bottom: 15px;
+            font-size: 18px;
+        }
+        
+        .avatar-options {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+        }
+        
+        .avatar-btn {
+            font-size: 35px;
+            padding: 8px;
+            border: 3px solid transparent;
+            border-radius: 50%;
+            cursor: pointer;
+            transition: all 0.3s;
+            background: #f8f9fa;
+        }
+        
+        .avatar-btn:hover {
+            transform: scale(1.2);
+        }
+        
+        .avatar-btn.selected {
+            border-color: #667eea;
+            background: #e8eaf6;
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+        }
+        
+        .color-options {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .color-btn {
+            width: 100%;
+            height: 50px;
+            border: 3px solid transparent;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .color-btn:hover {
+            transform: scale(1.1);
+        }
+        
+        .color-btn.selected {
+            border-color: #333;
+            box-shadow: 0 0 0 2px white, 0 0 0 5px #333;
+        }
+        
+        .start-btn {
+            width: 100%;
+            padding: 16px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .start-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
+        }
 
-  const rewards: Reward[] = [
-    { id: 'discount_5', icon: '🎫', title: '5% Discount', desc: 'Get 5% off your next purchase', cost: 50, type: 'discount' },
-    { id: 'discount_10', icon: '🎟️', title: '10% Discount', desc: 'Get 10% off your next purchase', cost: 100, type: 'discount' },
-    { id: 'discount_20', icon: '🏷️', title: '20% Discount', desc: 'Get 20% off your next purchase', cost: 200, type: 'discount' },
-    { id: 'free_ebook', icon: '📱', title: 'Free eBook', desc: 'Get any eBook for free', cost: 150, type: 'freebie' },
-    { id: 'free_physical', icon: '📚', title: 'Free Physical Book', desc: 'Get any physical book for free', cost: 300, type: 'freebie' },
-    { id: 'exclusive_badge', icon: '⭐', title: 'VIP Badge', desc: 'Get an exclusive VIP badge', cost: 250, type: 'badge' },
-    { id: 'early_access', icon: '🚀', title: 'Early Access', desc: 'Get early access to new releases', cost: 400, type: 'perk' },
-    { id: 'book_bundle', icon: '🎁', title: 'Book Bundle', desc: 'Get 3 random books', cost: 500, type: 'bundle' }
-  ];
+        .start-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        /* Header */
+        header {
+            background: rgba(255, 255, 255, 0.98);
+            padding: 25px 30px;
+            border-radius: 20px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            margin-bottom: 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 20px;
+            backdrop-filter: blur(10px);
+        }
+        
+        .logo {
+            font-size: 32px;
+            font-weight: 800;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            letter-spacing: -0.5px;
+        }
+        
+        .header-right {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        
+        .stats-panel {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        
+        .stat-box {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 12px 18px;
+            border-radius: 12px;
+            color: white;
+            font-weight: 600;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+        
+        .stat-box:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        }
+        
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            padding: 14px 28px;
+            border-radius: 30px;
+            color: white;
+            font-weight: bold;
+            font-size: 18px;
+            box-shadow: 0 4px 15px rgba(245, 87, 108, 0.4);
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .user-info:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(245, 87, 108, 0.6);
+        }
 
-  const unlockedAchievements = achievements.filter(a => a.condition());
+        .logout-btn {
+            background: linear-gradient(135deg, #f5576c 0%, #f093fb 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 4px 15px rgba(245, 87, 108, 0.3);
+        }
 
-  const themeColors = THEMES[userData.theme];
+        .logout-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(245, 87, 108, 0.5);
+        }
+        
+        /* Banner */
+        .banner {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            padding: 25px;
+            border-radius: 20px;
+            color: white;
+            text-align: center;
+            margin-bottom: 30px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+        
+        .banner h2 {
+            font-size: 24px;
+            margin-bottom: 8px;
+        }
+        
+        .banner p {
+            font-size: 16px;
+            opacity: 0.95;
+        }
+        
+        /* Filters */
+        .filters-section {
+            background: white;
+            padding: 25px;
+            border-radius: 20px;
+            margin-bottom: 30px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+        
+        .filters {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        
+        .search-box {
+            padding: 12px 20px;
+            border: 2px solid #e0e0e0;
+            border-radius: 12px;
+            font-size: 14px;
+            flex: 1;
+            min-width: 200px;
+            transition: all 0.3s;
+        }
+        
+        .search-box:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        
+        .filter-btn {
+            padding: 10px 20px;
+            border: 2px solid #667eea;
+            background: white;
+            color: #667eea;
+            border-radius: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .filter-btn:hover {
+            background: #f8f9ff;
+        }
+        
+        .filter-btn.active {
+            background: #667eea;
+            color: white;
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+        }
+        
+        /* Books Grid */
+        .books-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+            gap: 25px;
+            margin-bottom: 30px;
+        }
+        
+        .book-card {
+            background: white;
+            border-radius: 20px;
+            padding: 25px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+            transition: all 0.3s;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .book-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            transform: scaleX(0);
+            transition: transform 0.3s;
+        }
+        
+        .book-card:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 16px 48px rgba(0, 0, 0, 0.15);
+        }
+        
+        .book-card:hover::before {
+            transform: scaleX(1);
+        }
+        
+        .book-card.featured::after {
+            content: '🔥 HOT';
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: #f5576c;
+            color: white;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: bold;
+        }
+        
+        .book-rating {
+            display: flex;
+            gap: 5px;
+            margin-bottom: 12px;
+            font-size: 16px;
+        }
+        
+        .book-title {
+            font-size: 22px;
+            font-weight: 700;
+            color: #333;
+            margin-bottom: 15px;
+            line-height: 1.4;
+        }
+        
+        .book-meta {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+            font-size: 13px;
+            color: #666;
+            flex-wrap: wrap;
+        }
+        
+        .badge {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 700;
+            margin-left: 8px;
+            text-transform: uppercase;
+        }
+        
+        .book-prices {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 15px;
+        }
+        
+        .price-option {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px;
+            border-radius: 12px;
+            text-align: center;
+            font-weight: 600;
+        }
+        
+        .price-label {
+            font-size: 12px;
+            opacity: 0.9;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .price-value {
+            font-size: 22px;
+            font-weight: 700;
+        }
+        
+        .buy-buttons {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        
+        .buy-btn {
+            padding: 14px;
+            border: none;
+            border-radius: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 14px;
+        }
+        
+        .add-ebook {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .add-physical {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+        }
+        
+        .buy-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        }
+        
+        .preview-btn {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #667eea;
+            background: white;
+            color: #667eea;
+            border-radius: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .preview-btn:hover {
+            background: #667eea;
+            color: white;
+        }
+        
+        /* Cart Section */
+        .cart-section {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 25px;
+            margin-bottom: 30px;
+        }
+        
+        .cart {
+            background: white;
+            padding: 30px;
+            border-radius: 20px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+        
+        .cart h3 {
+            color: #667eea;
+            margin-bottom: 20px;
+            font-size: 24px;
+        }
+        
+        .cart-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px;
+            background: #f8f9fa;
+            margin-bottom: 12px;
+            border-radius: 12px;
+            transition: all 0.3s;
+        }
+        
+        .cart-item:hover {
+            background: #e8eaf6;
+        }
 
-  // Styles
-  const styles = `
-    body {
-      background: linear-gradient(135deg, ${themeColors.p} 0%, ${themeColors.s} 100%);
-      margin: 0;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-    }
-  `;
+        .remove-item {
+            background: #f5576c;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 600;
+            margin-left: 10px;
+        }
 
-  if (!isLoggedIn) {
-    return (
-      <>
-        <style>{styles}</style>
-        <div className="min-h-screen flex items-center justify-center p-5">
-          <div className="bg-white rounded-3xl shadow-2xl p-12 max-w-md w-full text-center">
-            <div className="text-6xl mb-5 animate-bounce">📚</div>
-            <h1 className="text-4xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent mb-8">
-              Welcome to Random Park Books!
-            </h1>
-            <p className="text-green-500 font-bold mb-6">
-              <span className="inline-block w-2.5 h-2.5 bg-green-500 rounded-full animate-pulse mr-2"></span>
-              Real-time sync enabled
+        .remove-item:hover {
+            background: #d43f56;
+        }
+        
+        .cart-summary {
+            background: white;
+            padding: 30px;
+            border-radius: 20px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+        
+        .summary-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 12px 0;
+            border-bottom: 1px solid #f0f0f0;
+            font-size: 15px;
+        }
+        
+        .summary-row:last-of-type {
+            border-bottom: none;
+        }
+
+        .checkout-btn {
+            width: 100%;
+            padding: 16px;
+            background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-weight: bold;
+            font-size: 16px;
+            cursor: pointer;
+            margin-top: 15px;
+            transition: all 0.3s;
+        }
+
+        .checkout-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(67, 233, 123, 0.4);
+        }
+
+        .checkout-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 1000;
+            overflow-y: auto;
+            animation: fadeIn 0.3s;
+        }
+        
+        .modal-content {
+            background: white;
+            max-width: 700px;
+            margin: 50px auto;
+            padding: 40px;
+            border-radius: 20px;
+            position: relative;
+            animation: slideUp 0.3s;
+        }
+        
+        .close-btn {
+            position: absolute;
+            top: 20px;
+            right: 25px;
+            font-size: 30px;
+            cursor: pointer;
+            color: #999;
+            transition: all 0.3s;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+        }
+        
+        .close-btn:hover {
+            color: #333;
+            background: #f0f0f0;
+        }
+        
+        .preview-text {
+            line-height: 1.8;
+            color: #333;
+            white-space: pre-wrap;
+            font-size: 16px;
+        }
+
+        /* Admin Panel */
+        .admin-book-item {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 15px;
+        }
+
+        .admin-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .admin-btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .admin-btn-edit {
+            background: #667eea;
+            color: white;
+        }
+
+        .admin-btn-delete {
+            background: #f5576c;
+            color: white;
+        }
+
+        .admin-tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+        }
+
+        .admin-tab {
+            padding: 12px 24px;
+            background: white;
+            border: 2px solid #667eea;
+            color: #667eea;
+            border-radius: 12px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+
+        .admin-tab.active {
+            background: #667eea;
+            color: white;
+        }
+
+        .admin-section {
+            display: none;
+        }
+
+        .admin-section.active {
+            display: block;
+        }
+
+        /* Achievements */
+        .achievements-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .achievement {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 12px;
+            text-align: center;
+            transition: all 0.3s;
+        }
+
+        .achievement.unlocked {
+            background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+            color: white;
+        }
+
+        .achievement-icon {
+            font-size: 40px;
+            margin-bottom: 10px;
+        }
+
+        .achievement-title {
+            font-weight: 700;
+            margin-bottom: 5px;
+        }
+
+        .achievement-desc {
+            font-size: 12px;
+            opacity: 0.8;
+        }
+        
+        /* Notification */
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 18px 28px;
+            border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+            z-index: 2000;
+            display: none;
+            animation: slideInRight 0.3s;
+            max-width: 400px;
+            font-weight: 600;
+        }
+        
+        .notification.success {
+            background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+        }
+        
+        .notification.error {
+            background: linear-gradient(135deg, #f5576c 0%, #f093fb 100%);
+        }
+        
+        .notification.info {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+        }
+        
+        @keyframes slideInRight {
+            from {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-20px); }
+        }
+        
+        #bookReaderModal .modal-content {
+            position: relative;
+            overflow: hidden;
+        }
+        
+        #bookReaderModal .modal-content::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(67, 233, 123, 0.1) 0%, transparent 70%);
+            animation: pulse 4s ease-in-out infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 0.5; transform: scale(1); }
+            50% { opacity: 1; transform: scale(1.1); }
+        }
+        
+        /* Loading spinner */
+        .loading-spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 0.8s linear infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .book-card:hover .book-title {
+            color: #667eea;
+            transition: color 0.3s;
+        }
+        
+        html {
+            scroll-behavior: smooth;
+        }
+        
+        ::-webkit-scrollbar {
+            width: 10px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 10px;
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 10px;
+        }
+        
+        ::-webkit-scrollbar-thumb:hover {
+            background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+        }
+        
+        /* Responsive */
+        @media (max-width: 1024px) {
+            .cart-section {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        @media (max-width: 768px) {
+            body {
+                padding: 10px;
+            }
+            
+            .welcome-box {
+                padding: 30px 20px;
+            }
+            
+            header {
+                padding: 20px;
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .header-right {
+                flex-direction: column;
+            }
+            
+            .books-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .book-prices {
+                grid-template-columns: 1fr;
+            }
+            
+            .buy-buttons {
+                grid-template-columns: 1fr;
+            }
+            
+            .color-options {
+                grid-template-columns: repeat(4, 1fr);
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .logo {
+                font-size: 24px;
+            }
+            
+            .banner h2 {
+                font-size: 18px;
+            }
+            
+            .filters {
+                flex-direction: column;
+            }
+            
+            .search-box {
+                width: 100%;
+            }
+        }
+
+        .online-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            background: #43e97b;
+            border-radius: 50%;
+            margin-right: 8px;
+            animation: blink 2s infinite;
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+    </style>
+</head>
+<body>
+    <!-- Welcome Screen -->
+    <div id="welcomeScreen" class="welcome-screen">
+        <div class="welcome-box">
+            <div class="welcome-icon">📚</div>
+            <h1>Welcome to Random Park Books!</h1>
+            <p style="color: #43e97b; font-weight: bold; margin-bottom: 20px;">
+                <span class="online-indicator"></span>Real-time sync enabled
             </p>
-
-            <div className="space-y-4 mb-6">
-              <div className="text-left">
-                <label className="block text-sm font-semibold mb-2">First Name:</label>
-                <input
-                  type="text"
-                  value={firstName}
-                  onChange={(e) => setFirstName(e.target.value)}
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-purple-500 focus:outline-none transition-all"
-                  placeholder="Enter your first name"
-                />
-              </div>
-              <div className="text-left">
-                <label className="block text-sm font-semibold mb-2">Last Name:</label>
-                <input
-                  type="text"
-                  value={lastName}
-                  onChange={(e) => setLastName(e.target.value)}
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-purple-500 focus:outline-none transition-all"
-                  placeholder="Enter your last name"
-                />
-              </div>
+            
+            <div class="login-buttons" id="loginButtons">
+                <div class="form-group">
+                    <label for="firstName">First Name:</label>
+                    <input type="text" id="firstName" placeholder="Enter your first name" required>
+                </div>
+                <div class="form-group">
+                    <label for="lastName">Last Name:</label>
+                    <input type="text" id="lastName" placeholder="Enter your last name" required>
+                </div>
             </div>
-
-            <div className="border-t-2 border-gray-100 pt-6 mb-6">
-              <h3 className="text-purple-600 font-bold mb-4">Choose Your Avatar</h3>
-              <div className="flex justify-center gap-2 flex-wrap mb-6">
-                {['😊', '😃', '🙂', '😄', '😁', '😆'].map(emoji => (
-                  <button
-                    key={emoji}
-                    onClick={() => setSelectedAvatar(emoji)}
-                    className={`text-3xl p-2 rounded-full transition-all ${
-                      selectedAvatar === emoji 
-                        ? 'ring-4 ring-purple-500 bg-purple-100 scale-110' 
-                        : 'hover:scale-110'
-                    }`}
-                  >
-                    {emoji}
-                  </button>
-                ))}
-              </div>
-
-              <h3 className="text-purple-600 font-bold mb-4">Choose Your Theme</h3>
-              <div className="grid grid-cols-4 gap-3">
-                {(Object.keys(THEMES) as ThemeType[]).map(theme => (
-                  <button
-                    key={theme}
-                    onClick={() => setSelectedTheme(theme)}
-                    className={`h-12 rounded-xl transition-all ${
-                      selectedTheme === theme 
-                        ? 'ring-4 ring-black scale-105' 
-                        : 'hover:scale-105'
-                    }`}
-                    style={{
-                      background: `linear-gradient(135deg, ${THEMES[theme].p} 0%, ${THEMES[theme].s} 100%)`
-                    }}
-                  />
-                ))}
-              </div>
+            
+            <div class="customize-section">
+                <h3>Choose Your Avatar</h3>
+                <div class="avatar-options">
+                    <button class="avatar-btn selected" onclick="selectAvatar(this, '😊')">😊</button>
+                    <button class="avatar-btn" onclick="selectAvatar(this, '😃')">😃</button>
+                    <button class="avatar-btn" onclick="selectAvatar(this, '🙂')">🙂</button>
+                    <button class="avatar-btn" onclick="selectAvatar(this, '😄')">😄</button>
+                    <button class="avatar-btn" onclick="selectAvatar(this, '😁')">😁</button>
+                    <button class="avatar-btn" onclick="selectAvatar(this, '😆')">😆</button>
+                </div>
             </div>
-
-            <button
-              onClick={handleLogin}
-              className="w-full py-4 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-xl font-bold text-lg hover:shadow-lg transition-all hover:-translate-y-1"
-            >
-              Continue to Store 🛍️
-            </button>
-          </div>
+            
+            <div class="customize-section">
+                <h3>Choose Your Theme</h3>
+                <div class="color-options">
+                    <button class="color-btn selected" onclick="selectColor(this, 'purple')" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);"></button>
+                    <button class="color-btn" onclick="selectColor(this, 'blue')" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);"></button>
+                    <button class="color-btn" onclick="selectColor(this, 'pink')" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);"></button>
+                    <button class="color-btn" onclick="selectColor(this, 'green')" style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);"></button>
+                </div>
+            </div>
+            
+            <button class="start-btn" onclick="startApp()" id="startBtn">Continue to Store 🛍️</button>
         </div>
-      </>
-    );
-  }
+    </div>
 
-  return (
-    <>
-      <style>{styles}</style>
-      <div className="min-h-screen p-5">
-        <div className="max-w-7xl mx-auto">
-          {/* Header */}
-          <header className="bg-white/98 backdrop-blur-sm rounded-3xl shadow-xl p-6 mb-8 flex justify-between items-center flex-wrap gap-5">
-            <h1 className="text-3xl font-extrabold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
-              📚 Random Park Books
-            </h1>
-            <div className="flex gap-3 items-center flex-wrap">
-              <button
-                onClick={() => setShowAchievements(true)}
-                className="px-4 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-xl font-semibold hover:shadow-lg transition-all"
-              >
-                🏆 {unlockedAchievements.length}/{achievements.length}
-              </button>
-              <button
-                onClick={() => setShowRewards(true)}
-                className="px-4 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-xl font-semibold hover:shadow-lg transition-all"
-              >
-                🎁 Rewards
-              </button>
-              <button
-                onClick={() => setShowProfile(true)}
-                className="px-4 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-xl font-semibold hover:shadow-lg transition-all"
-              >
-                ⚙️ Profile
-              </button>
-              <button
-                onClick={() => setShowAdminLogin(true)}
-                className="px-4 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-xl font-semibold hover:shadow-lg transition-all"
-              >
-                🔐 Admin
-              </button>
-              <div className="px-6 py-3 bg-gradient-to-r from-pink-500 to-red-500 text-white rounded-full font-bold flex items-center gap-3 shadow-lg">
-                <span className="text-2xl">{userData.avatar}</span>
-                <span>{userData.name}</span>
-              </div>
+    <!-- Main App -->
+    <div class="container" id="mainApp" style="display: none;">
+        <header>
+            <div class="logo">📚 Random Park Books</div>
+            <div class="header-right">
+                <div class="stats-panel">
+                    <div class="stat-box" onclick="showAchievements()">
+                        <span>🏆</span>
+                        <span><span id="achievementCount">0</span>/<span id="totalAchievements">8</span></span>
+                    </div>
+                    <div class="stat-box" onclick="showRewards()">
+                        <span>🎁</span>
+                        <span>Rewards</span>
+                    </div>
+                    <div class="stat-box" onclick="showProfile()">
+                        <span>⚙️</span>
+                        <span>Profile</span>
+                    </div>
+                    <div class="stat-box" onclick="openAdminLogin()">
+                        <span>🔐</span>
+                        <span>Admin</span>
+                    </div>
+                </div>
+                <div class="user-info">
+                    <span id="userAvatar">😊</span>
+                    <span id="displayName">Guest</span>
+                </div>
             </div>
-          </header>
+        </header>
 
-          {/* Banner */}
-          <div className="bg-gradient-to-r from-pink-500 to-red-500 rounded-3xl p-6 text-white text-center mb-8 shadow-xl">
-            <h2 className="text-2xl font-bold mb-2">🎉 Find Your Next Favorite Book! 🎉</h2>
+        <div class="banner">
+            <h2>🎉 Find Your Next Favorite Book! 🎉</h2>
             <p>Browse our collection • Add to cart • Complete your order</p>
-          </div>
+        </div>
 
-          {/* Filters */}
-          <div className="bg-white rounded-3xl p-6 mb-8 shadow-xl">
-            <div className="flex gap-3 flex-wrap items-center">
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="🔍 Search books..."
-                className="flex-1 min-w-[200px] px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-purple-500 focus:outline-none transition-all"
-              />
-              {(['all', 'ebook', 'physical', 'popular'] as FilterType[]).map(filter => (
-                <button
-                  key={filter}
-                  onClick={() => setCurrentFilter(filter)}
-                  className={`px-5 py-3 rounded-xl font-semibold transition-all ${
-                    currentFilter === filter
-                      ? 'bg-purple-600 text-white shadow-lg'
-                      : 'border-2 border-purple-600 text-purple-600 hover:bg-purple-50'
-                  }`}
-                >
-                  {filter === 'all' && 'All Books'}
-                  {filter === 'ebook' && 'eBooks'}
-                  {filter === 'physical' && 'Physical'}
-                  {filter === 'popular' && 'Popular'}
+        <div class="filters-section">
+            <div class="filters">
+                <input type="text" class="search-box" id="searchBox" placeholder="🔍 Search books..." oninput="filterBooks()">
+                <button class="filter-btn active" onclick="setFilter('all')">All Books</button>
+                <button class="filter-btn" onclick="setFilter('ebook')">eBooks</button>
+                <button class="filter-btn" onclick="setFilter('physical')">Physical</button>
+                <button class="filter-btn" onclick="setFilter('popular')">Popular</button>
+            </div>
+        </div>
+
+        <div class="books-grid" id="booksGrid"></div>
+
+        <div class="cart-section">
+            <div class="cart">
+                <h3>🛒 Shopping Cart</h3>
+                <div id="cartItems">
+                    <p style="color: #999;">Your cart is empty. Add some books!</p>
+                </div>
+            </div>
+            
+            <div class="cart-summary">
+                <h3>📊 Cart Summary</h3>
+                <div class="summary-row">
+                    <span>Items in Cart:</span>
+                    <span id="totalItems">0</span>
+                </div>
+                <div class="summary-row">
+                    <span>Total eBooks:</span>
+                    <span id="ebookCount">0</span>
+                </div>
+                <div class="summary-row">
+                    <span>Total Physical:</span>
+                    <span id="physicalCount">0</span>
+                </div>
+                <button class="checkout-btn" onclick="proceedToCheckout()" id="checkoutBtn" disabled>
+                    🛒 Complete Order
                 </button>
-              ))}
             </div>
-          </div>
-
-          {/* Books Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-            {filteredBooks.map((book, index) => {
-              const stars = '⭐'.repeat(Math.floor(book.rating));
-              const halfStar = book.rating % 1 >= 0.5 ? '⭐' : '';
-              
-              return (
-                <div
-                  key={book.id}
-                  className="bg-white rounded-3xl p-6 shadow-xl hover:shadow-2xl hover:-translate-y-2 transition-all relative overflow-hidden"
-                >
-                  {book.badge && (
-                    <div className="absolute top-4 right-4 bg-red-500 text-white px-3 py-1 rounded-full text-xs font-bold">
-                      🔥 {book.badge}
-                    </div>
-                  )}
-                  
-                  <div className="text-lg mb-3">{stars}{halfStar} ({book.rating})</div>
-                  <h3 className="text-xl font-bold mb-4 text-gray-800">{book.title}</h3>
-                  
-                  <div className="flex gap-3 text-sm text-gray-600 mb-5 flex-wrap">
-                    <span>📦 {book.sales} sold</span>
-                    {book.popular && <span className="text-red-500">🔥 Trending</span>}
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3 mb-4">
-                    <div className="bg-gradient-to-br from-purple-600 to-pink-600 text-white p-4 rounded-xl text-center">
-                      <div className="text-xs opacity-90 mb-1">EBOOK</div>
-                      <div className="text-2xl font-bold">${book.ebook}</div>
-                    </div>
-                    <div className="bg-gradient-to-br from-purple-600 to-pink-600 text-white p-4 rounded-xl text-center">
-                      <div className="text-xs opacity-90 mb-1">PHYSICAL</div>
-                      <div className="text-2xl font-bold">${book.physical}</div>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3 mb-3">
-                    <button
-                      onClick={() => addToCart(book, 'ebook')}
-                      className="py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-xl font-semibold hover:scale-105 transition-all"
-                    >
-                      🛒 Add eBook
-                    </button>
-                    <button
-                      onClick={() => addToCart(book, 'physical')}
-                      className="py-3 bg-gradient-to-r from-pink-500 to-red-500 text-white rounded-xl font-semibold hover:scale-105 transition-all"
-                    >
-                      🛒 Add Physical
-                    </button>
-                  </div>
-
-                  <button
-                    onClick={() => {
-                      setPreviewBook(book);
-                      setShowPreview(true);
-                    }}
-                    className="w-full py-3 border-2 border-purple-600 text-purple-600 rounded-xl font-semibold hover:bg-purple-600 hover:text-white transition-all"
-                  >
-                    👁️ Read Preview
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Cart Section */}
-          <div className="grid lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2 bg-white rounded-3xl p-6 shadow-xl">
-              <h3 className="text-2xl font-bold text-purple-600 mb-5">🛒 Shopping Cart</h3>
-              {userData.cart.length === 0 ? (
-                <p className="text-gray-400 text-center py-8">Your cart is empty. Add some books!</p>
-              ) : (
-                <div className="space-y-3">
-                  {userData.cart.map((item, index) => (
-                    <div key={index} className="flex justify-between items-center p-4 bg-gray-50 rounded-xl hover:bg-purple-50 transition-all">
-                      <div>
-                        <div className="font-bold">{item.title}</div>
-                        <div className="text-sm text-gray-600">{item.type} • ${item.price}</div>
-                      </div>
-                      <button
-                        onClick={() => removeFromCart(index)}
-                        className="px-4 py-2 bg-red-500 text-white rounded-lg font-semibold hover:bg-red-600 transition-all"
-                      >
-                        Remove
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <div className="bg-white rounded-3xl p-6 shadow-xl">
-              <h3 className="text-2xl font-bold text-purple-600 mb-5">📊 Cart Summary</h3>
-              <div className="space-y-3 mb-6">
-                <div className="flex justify-between py-3 border-b">
-                  <span>Items in Cart:</span>
-                  <span className="font-bold">{userData.cart.length}</span>
-                </div>
-                <div className="flex justify-between py-3 border-b">
-                  <span>Total eBooks:</span>
-                  <span className="font-bold">{userData.cart.filter(i => i.type === 'ebook').length}</span>
-                </div>
-                <div className="flex justify-between py-3">
-                  <span>Total Physical:</span>
-                  <span className="font-bold">{userData.cart.filter(i => i.type === 'physical').length}</span>
-                </div>
-              </div>
-              <button
-                onClick={() => setShowCheckout(true)}
-                disabled={userData.cart.length === 0}
-                className="w-full py-4 bg-gradient-to-r from-green-400 to-cyan-400 text-white rounded-xl font-bold hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                🛒 Complete Order
-              </button>
-            </div>
-          </div>
         </div>
-      </div>
+    </div>
 
-      {/* Preview Modal */}
-      {showPreview && previewBook && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-5 z-50" onClick={() => setShowPreview(false)}>
-          <div className="bg-white rounded-3xl p-8 max-w-2xl w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-            <div className="flex justify-between items-start mb-6">
-              <h2 className="text-3xl font-bold text-purple-600">{previewBook.title}</h2>
-              <button onClick={() => setShowPreview(false)} className="text-4xl hover:text-gray-600">&times;</button>
-            </div>
-            <p className="whitespace-pre-wrap text-gray-700 leading-relaxed">{previewBook.preview}</p>
-          </div>
+    <!-- Preview Modal -->
+    <div id="previewModal" class="modal" onclick="closeModal(event, 'previewModal')">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <span class="close-btn" onclick="closePreview()">&times;</span>
+            <h2 id="previewTitle" style="color: #667eea; margin-bottom: 20px;"></h2>
+            <div id="previewText" class="preview-text"></div>
         </div>
-      )}
+    </div>
 
-      {/* Profile Modal */}
-      {showProfile && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-5 z-50" onClick={() => setShowProfile(false)}>
-          <div className="bg-white rounded-3xl p-8 max-w-4xl w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-            <div className="flex justify-between items-start mb-6">
-              <h2 className="text-3xl font-bold text-purple-600">👤 Your Profile</h2>
-              <button onClick={() => setShowProfile(false)} className="text-4xl hover:text-gray-600">&times;</button>
+    <!-- Profile Modal -->
+    <div id="profileModal" class="modal" onclick="closeModal(event, 'profileModal')">
+        <div class="modal-content" style="max-width: 900px; max-height: 90vh; overflow-y: auto;" onclick="event.stopPropagation()">
+            <span class="close-btn" onclick="closeProfile()">&times;</span>
+            <h2 style="color: #667eea; margin-bottom: 30px;">👤 Your Profile</h2>
+            
+            <div class="form-group">
+                <label>Name:</label>
+                <input type="text" id="profileName" onchange="updateProfile()">
+            </div>
+            
+            <div class="customize-section">
+                <h3>Change Avatar</h3>
+                <div class="avatar-options">
+                    <button class="avatar-btn" onclick="updateAvatar(this, '😊')">😊</button>
+                    <button class="avatar-btn" onclick="updateAvatar(this, '😃')">😃</button>
+                    <button class="avatar-btn" onclick="updateAvatar(this, '🙂')">🙂</button>
+                    <button class="avatar-btn" onclick="updateAvatar(this, '😄')">😄</button>
+                    <button class="avatar-btn" onclick="updateAvatar(this, '😁')">😁</button>
+                    <button class="avatar-btn" onclick="updateAvatar(this, '😆')">😆</button>
+                    <button class="avatar-btn" onclick="updateAvatar(this, '🤓')">🤓</button>
+                    <button class="avatar-btn" onclick="updateAvatar(this, '😎')">😎</button>
+                    <button class="avatar-btn" onclick="updateAvatar(this, '🥳')">🥳</button>
+                    <button class="avatar-btn" onclick="updateAvatar(this, '🤩')">🤩</button>
+                </div>
+            </div>
+            
+            <div class="customize-section">
+                <h3>Change Theme</h3>
+                <div class="color-options">
+                    <button class="color-btn" onclick="updateTheme(this, 'purple')" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);"></button>
+                    <button class="color-btn" onclick="updateTheme(this, 'blue')" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);"></button>
+                    <button class="color-btn" onclick="updateTheme(this, 'pink')" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);"></button>
+                    <button class="color-btn" onclick="updateTheme(this, 'green')" style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);"></button>
+                    <button class="color-btn" onclick="updateTheme(this, 'orange')" style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);"></button>
+                    <button class="color-btn" onclick="updateTheme(this, 'teal')" style="background: linear-gradient(135deg, #30cfd0 0%, #330867 100%);"></button>
+                </div>
             </div>
 
-            <div className="space-y-6">
-              <div>
-                <label className="block font-semibold mb-2">Name:</label>
-                <input
-                  type="text"
-                  value={userData.name}
-                  readOnly
-                  className="w-full px-4 py-3 bg-gray-100 border-2 border-gray-200 rounded-xl"
-                />
-              </div>
-
-              <div>
-                <h3 className="font-bold text-purple-600 mb-3">Change Avatar</h3>
-                <div className="flex gap-2 flex-wrap">
-                  {['😊', '😃', '🙂', '😄', '😁', '😆', '🤓', '😎', '🥳', '🤩'].map(emoji => (
-                    <button
-                      key={emoji}
-                      onClick={() => setUserData(prev => ({ ...prev, avatar: emoji }))}
-                      className={`text-3xl p-2 rounded-full transition-all ${
-                        userData.avatar === emoji ? 'ring-4 ring-purple-500 bg-purple-100 scale-110' : 'hover:scale-110'
-                      }`}
-                    >
-                      {emoji}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <h3 className="font-bold text-purple-600 mb-3">Change Theme</h3>
-                <div className="grid grid-cols-6 gap-3">
-                  {(Object.keys(THEMES) as ThemeType[]).map(theme => (
-                    <button
-                      key={theme}
-                      onClick={() => setUserData(prev => ({ ...prev, theme }))}
-                      className={`h-12 rounded-xl transition-all ${
-                        userData.theme === theme ? 'ring-4 ring-black scale-105' : 'hover:scale-105'
-                      }`}
-                      style={{
-                        background: `linear-gradient(135deg, ${THEMES[theme].p} 0%, ${THEMES[theme].s} 100%)`
-                      }}
-                    />
-                  ))}
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4 p-4 bg-gray-50 rounded-xl">
-                <div>
-                  <div className="text-gray-600">Total Purchases:</div>
-                  <div className="text-2xl font-bold">{userData.orders.length}</div>
-                </div>
-                <div>
-                  <div className="text-gray-600">🎁 Reward Points:</div>
-                  <div className="text-2xl font-bold text-red-500">{userData.rewardPoints}</div>
-                </div>
-              </div>
-
-              <div>
-                <h3 className="font-bold text-purple-600 mb-3">
-                  {userData.isSpecialAdmin ? '👑 All Customer Orders' : '📦 Your Orders'}
-                </h3>
-                {(userData.isSpecialAdmin ? globalOrders : userData.orders).length === 0 ? (
-                  <p className="text-gray-400 text-center py-4">No orders yet.</p>
-                ) : (
-                  <div className="space-y-3 max-h-96 overflow-y-auto">
-                    {(userData.isSpecialAdmin ? globalOrders : userData.orders).slice().reverse().map(order => (
-                      <div key={order.id} className="p-4 bg-gray-50 rounded-xl">
-                        <h4 className="font-bold mb-2">Order #{order.id}</h4>
-                        {userData.isSpecialAdmin && (
-                          <p className="text-red-500 font-bold mb-2">👤 Customer: {order.name} ({order.email})</p>
-                        )}
-                        <p className="text-sm text-gray-600 mb-1"><strong>Date:</strong> {order.date}</p>
-                        <p className="text-sm text-gray-600 mb-1"><strong>Total:</strong> ${order.total}</p>
-                        <p className="text-sm text-gray-600 mb-1"><strong>Items:</strong></p>
-                        <ul className="ml-5 text-sm text-gray-600 list-disc">
-                          {order.items.map((item, i) => (
-                            <li key={i}>{item.title} ({item.type}) - ${item.price}</li>
-                          ))}
-                        </ul>
-                        {order.notes && <p className="text-sm text-gray-500 italic mt-2">Notes: {order.notes}</p>}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {deliveredBooks.filter(b => b.customerName.toLowerCase() === userData.name.toLowerCase()).length > 0 && (
-                <div>
-                  <h3 className="font-bold text-purple-600 mb-3">📚 Books Delivered to You</h3>
-                  <div className="space-y-3">
-                    {deliveredBooks
-                      .filter(b => b.customerName.toLowerCase() === userData.name.toLowerCase())
-                      .map(book => (
-                        <div key={book.id} className="p-4 bg-gradient-to-r from-green-50 to-cyan-50 border-2 border-green-400 rounded-xl">
-                          <h4 className="font-bold mb-2">📖 {book.bookTitle}</h4>
-                          <p className="text-sm text-gray-600 mb-3">Delivered: {book.date}</p>
-                          <button
-                            onClick={() => {
-                              setCurrentReadingBook(book);
-                              setShowBookReader(true);
-                              setShowProfile(false);
-                            }}
-                            className="px-4 py-2 bg-green-500 text-white rounded-lg font-semibold hover:bg-green-600"
-                          >
-                            📚 Read Book
-                          </button>
-                        </div>
-                      ))}
-                  </div>
-                </div>
-              )}
-
-              <button
-                onClick={handleLogout}
-                className="w-full py-3 bg-gradient-to-r from-red-500 to-pink-500 text-white rounded-xl font-bold hover:shadow-lg transition-all"
-              >
-                🚪 Logout
-              </button>
+            <div class="summary-row" style="margin-top: 20px;">
+                <span>Total Purchases:</span>
+                <span id="profilePurchases">0</span>
             </div>
-          </div>
+            
+            <div class="summary-row">
+                <span>🎁 Reward Points:</span>
+                <span id="profileRewardPoints" style="color: #f5576c; font-weight: bold;">0</span>
+            </div>
+
+            <div class="customize-section">
+                <h3 id="ordersHeader">📦 Your Orders</h3>
+                <div id="profileOrdersList"></div>
+            </div>
+            
+            <div class="customize-section" id="deliveredBooksSection" style="display: none;">
+                <h3>📚 Books Delivered to You</h3>
+                <div id="profileDeliveredBooks"></div>
+            </div>
+
+            <button class="logout-btn" onclick="logout()" style="width: 100%; margin-top: 20px;">🚪 Logout</button>
         </div>
-      )}
+    </div>
 
-      {/* Achievements Modal */}
-      {showAchievements && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-5 z-50" onClick={() => setShowAchievements(false)}>
-          <div className="bg-white rounded-3xl p-8 max-w-4xl w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-            <div className="flex justify-between items-start mb-6">
-              <h2 className="text-3xl font-bold text-purple-600">🏆 Achievements</h2>
-              <button onClick={() => setShowAchievements(false)} className="text-4xl hover:text-gray-600">&times;</button>
+    <!-- Achievements Modal -->
+    <div id="achievementsModal" class="modal" onclick="closeModal(event, 'achievementsModal')">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <span class="close-btn" onclick="closeAchievements()">&times;</span>
+            <h2 style="color: #667eea; margin-bottom: 30px;">🏆 Achievements</h2>
+            <div class="achievements-grid" id="achievementsList"></div>
+        </div>
+    </div>
+
+    <!-- Rewards Modal -->
+    <div id="rewardsModal" class="modal" onclick="closeModal(event, 'rewardsModal')">
+        <div class="modal-content" style="max-width: 900px;" onclick="event.stopPropagation()">
+            <span class="close-btn" onclick="closeRewards()">&times;</span>
+            <h2 style="color: #667eea; margin-bottom: 20px;">🎁 Rewards Center</h2>
+            
+            <div style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); padding: 25px; border-radius: 15px; margin-bottom: 30px; color: white; text-align: center;">
+                <h3 style="font-size: 24px; margin-bottom: 10px;">Your Points Balance</h3>
+                <div style="font-size: 48px; font-weight: bold;" id="rewardPoints">0</div>
+                <p style="opacity: 0.9; margin-top: 10px;">Earn points by purchasing books!</p>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              {achievements.map(achievement => {
-                const unlocked = achievement.condition();
-                return (
-                  <div
-                    key={achievement.id}
-                    className={`p-4 rounded-xl text-center transition-all ${
-                      unlocked ? 'bg-gradient-to-br from-green-400 to-cyan-400 text-white' : 'bg-gray-100'
-                    }`}
-                  >
-                    <div className="text-4xl mb-2">{achievement.icon}</div>
-                    <div className="font-bold mb-1">{achievement.title}</div>
-                    <div className="text-sm opacity-80">{achievement.desc}</div>
-                    <div className="mt-2 font-bold">
-                      {unlocked ? '✅ Unlocked' : '🔒 Locked'}
+
+            <h3 style="color: #667eea; margin-bottom: 20px;">🛍️ Redeem Rewards</h3>
+            <div class="achievements-grid" id="rewardsList"></div>
+        </div>
+    </div>
+
+    <!-- Admin Login Modal -->
+    <div id="adminLoginModal" class="modal" onclick="closeModal(event, 'adminLoginModal')">
+        <div class="modal-content" style="max-width: 450px;" onclick="event.stopPropagation()">
+            <span class="close-btn" onclick="closeAdminLogin()">&times;</span>
+            <h2 style="color: #667eea; margin-bottom: 30px; text-align: center;">🔐 Admin Login</h2>
+            <div class="form-group">
+                <label for="adminPassword">Enter Admin Password:</label>
+                <input type="password" id="adminPassword" placeholder="Enter password">
+            </div>
+            <button class="checkout-btn" onclick="checkAdminPassword()">Login</button>
+        </div>
+    </div>
+
+    <!-- Admin Panel -->
+    <div id="adminPanel" class="modal" onclick="closeModal(event, 'adminPanel')">
+        <div class="modal-content" style="max-width: 1200px; max-height: 90vh; overflow-y: auto;" onclick="event.stopPropagation()">
+            <span class="close-btn" onclick="closeAdminPanel()">&times;</span>
+            <h2 style="color: #667eea; margin-bottom: 30px; text-align: center;">👑 Admin Control Panel</h2>
+            
+            <div class="admin-tabs">
+                <button class="admin-tab active" onclick="showAdminTab('books')">📚 Manage Books</button>
+                <button class="admin-tab" onclick="showAdminTab('add')">➕ Add Book</button>
+                <button class="admin-tab" onclick="showAdminTab('orders')">📧 Orders</button>
+            </div>
+
+            <div id="adminBooksSection" class="admin-section active">
+                <h3 style="color: #667eea; margin-bottom: 20px;">All Books</h3>
+                <div id="adminBooksList"></div>
+            </div>
+
+            <div id="adminAddSection" class="admin-section">
+                <h3 style="color: #667eea; margin-bottom: 20px;">Add New Book</h3>
+                <div class="form-group">
+                    <label>Book Title:</label>
+                    <input type="text" id="newBookTitle">
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                    <div class="form-group">
+                        <label>eBook Price ($):</label>
+                        <input type="number" id="newBookEbook" value="5">
                     </div>
-                  </div>
-                );
-              })}
+                    <div class="form-group">
+                        <label>Physical Price ($):</label>
+                        <input type="number" id="newBookPhysical" value="10">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Rating (0-5):</label>
+                    <input type="number" step="0.1" min="0" max="5" id="newBookRating" value="4.5">
+                </div>
+                <div class="form-group">
+                    <label>Sales Count:</label>
+                    <input type="number" id="newBookSales" value="0">
+                </div>
+                <div class="form-group">
+                    <label>Badge (optional):</label>
+                    <input type="text" id="newBookBadge" placeholder="e.g., BESTSELLER, NEW">
+                </div>
+                <div class="form-group">
+                    <label>Mark as Popular:</label>
+                    <input type="checkbox" id="newBookPopular">
+                </div>
+                <div class="form-group">
+                    <label>Book Preview:</label>
+                    <textarea id="newBookPreview" rows="5"></textarea>
+                </div>
+                <button class="checkout-btn" onclick="addNewBook()">Add Book</button>
             </div>
-          </div>
-        </div>
-      )}
 
-      {/* Rewards Modal */}
-      {showRewards && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-5 z-50" onClick={() => setShowRewards(false)}>
-          <div className="bg-white rounded-3xl p-8 max-w-4xl w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-            <div className="flex justify-between items-start mb-6">
-              <h2 className="text-3xl font-bold text-purple-600">🎁 Rewards Center</h2>
-              <button onClick={() => setShowRewards(false)} className="text-4xl hover:text-gray-600">&times;</button>
-            </div>
-
-            <div className="bg-gradient-to-r from-pink-500 to-red-500 text-white p-6 rounded-2xl text-center mb-6">
-              <h3 className="text-2xl font-bold mb-2">Your Points Balance</h3>
-              <div className="text-5xl font-bold">{userData.rewardPoints}</div>
-              <p className="mt-2 opacity-90">Earn points by purchasing books!</p>
-            </div>
-
-            <h3 className="text-xl font-bold text-purple-600 mb-4">🛍️ Redeem Rewards</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              {rewards.map(reward => {
-                const redeemed = userData.redeemedRewards.includes(reward.id);
-                const canAfford = userData.rewardPoints >= reward.cost;
+            <div id="adminOrdersSection" class="admin-section">
+                <h3 style="color: #667eea; margin-bottom: 20px;">Customer Orders</h3>
+                <div id="adminOrdersList">
+                    <p style="color: #999;">No orders yet.</p>
+                </div>
                 
-                return (
-                  <div
-                    key={reward.id}
-                    className={`p-4 rounded-xl text-center ${
-                      redeemed ? 'bg-gradient-to-br from-green-400 to-cyan-400 text-white' : 'bg-gray-100'
-                    }`}
-                  >
-                    <div className="text-4xl mb-2">{reward.icon}</div>
-                    <div className="font-bold mb-1">{reward.title}</div>
-                    <div className="text-sm opacity-80 mb-2">{reward.desc}</div>
-                    <div className="text-xl font-bold mb-2">{reward.cost} Points</div>
-                    {redeemed ? (
-                      <div className="font-bold">✅ Redeemed</div>
-                    ) : (
-                      <button
-                        onClick={() => {
-                          if (canAfford && !redeemed) {
-                            if (window.confirm(`Redeem "${reward.title}" for ${reward.cost} points?`)) {
-                              setUserData(prev => ({
-                                ...prev,
-                                rewardPoints: prev.rewardPoints - reward.cost,
-                                redeemedRewards: [...prev.redeemedRewards, reward.id]
-                              }));
-                              showNotificationMsg(`🎉 Successfully redeemed: ${reward.title}!`, 'success');
-                            }
-                          }
-                        }}
-                        disabled={!canAfford}
-                        className="px-4 py-2 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-                      >
-                        {canAfford ? '🎁 Redeem' : '🔒 Locked'}
-                      </button>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Checkout Modal */}
-      {showCheckout && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-5 z-50" onClick={() => setShowCheckout(false)}>
-          <div className="bg-white rounded-3xl p-8 max-w-2xl w-full" onClick={(e) => e.stopPropagation()}>
-            <div className="flex justify-between items-start mb-6">
-              <h2 className="text-3xl font-bold text-purple-600">🛒 Complete Your Order</h2>
-              <button onClick={() => setShowCheckout(false)} className="text-4xl hover:text-gray-600">&times;</button>
-            </div>
-
-            <div className="bg-gray-50 p-4 rounded-xl mb-6">
-              <h3 className="font-bold mb-3">Order Summary:</h3>
-              <div className="space-y-2">
-                {userData.cart.map((item, i) => (
-                  <div key={i} className="flex justify-between py-2 border-b">
-                    <span><strong>{item.title}</strong> ({item.type})</span>
-                    <span>${item.price}</span>
-                  </div>
-                ))}
-                <div className="flex justify-between py-3 font-bold text-xl">
-                  <span>Total:</span>
-                  <span>${userData.cart.reduce((sum, item) => sum + item.price, 0)}</span>
+                <div style="margin-top: 40px; padding-top: 30px; border-top: 3px solid #667eea;">
+                    <h3 style="color: #667eea; margin-bottom: 20px;">📚 Deliver Book Directly</h3>
+                    <p style="color: #666; margin-bottom: 20px;">Send a book directly to a customer without them placing an order.</p>
+                    
+                    <div class="form-group">
+                        <label>Customer Name:</label>
+                        <input type="text" id="deliverCustomerName" placeholder="e.g., Anne Bell">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Select Book:</label>
+                        <select id="deliverBookSelect" style="width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 14px;">
+                            <option value="">-- Choose a book --</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Book Content (Full Text):</label>
+                        <textarea id="deliverBookContent" rows="10" placeholder="Paste the full book content here..." style="font-family: monospace; font-size: 13px;"></textarea>
+                        <small style="color: #999; display: block; margin-top: 5px;">This text will appear when the customer reads the book.</small>
+                    </div>
+                    
+                    <button class="checkout-btn" onclick="deliverBookToCustomer()">📤 Send Book to Customer</button>
                 </div>
-              </div>
             </div>
-
-            <div className="mb-6">
-              <label className="block font-semibold mb-2">Your Name:</label>
-              <input
-                type="text"
-                value={userData.name}
-                readOnly
-                className="w-full px-4 py-3 bg-gray-100 border-2 border-gray-200 rounded-xl"
-              />
-            </div>
-
-            <div className="mb-6">
-              <label className="block font-semibold mb-2">Additional Notes (optional):</label>
-              <textarea
-                value={checkoutNotes}
-                onChange={(e) => setCheckoutNotes(e.target.value)}
-                rows={3}
-                placeholder="Any special requests or notes..."
-                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-purple-500 focus:outline-none"
-              />
-            </div>
-
-            <button
-              onClick={handleCheckout}
-              className="w-full py-4 bg-gradient-to-r from-green-400 to-cyan-400 text-white rounded-xl font-bold hover:shadow-lg transition-all"
-            >
-              ✅ Confirm Order
-            </button>
-          </div>
         </div>
-      )}
+    </div>
 
-      {/* Book Reader Modal */}
-      {showBookReader && currentReadingBook && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-5 z-50" onClick={() => setShowBookReader(false)}>
-          <div
-            className="bg-gradient-to-br from-gray-900 via-blue-900 to-purple-900 text-white rounded-3xl p-8 max-w-4xl w-full max-h-[90vh] overflow-y-auto"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex justify-between items-start mb-6">
-              <div className="text-6xl mb-4 animate-bounce">📖</div>
-              <button onClick={() => setShowBookReader(false)} className="text-4xl text-white hover:text-gray-300">&times;</button>
+    <!-- Checkout Modal -->
+    <div id="checkoutModal" class="modal" onclick="closeModal(event, 'checkoutModal')">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <span class="close-btn" onclick="closeCheckout()">&times;</span>
+            <h2 style="color: #667eea; margin-bottom: 30px;">🛒 Complete Your Order</h2>
+            
+            <div style="background: #f8f9fa; padding: 20px; border-radius: 12px; margin-bottom: 20px;">
+                <h3 style="margin-bottom: 10px;">Order Summary:</h3>
+                <div id="checkoutSummary"></div>
             </div>
-            <h2 className="text-4xl font-bold text-green-400 mb-6 text-center">{currentReadingBook.bookTitle}</h2>
-            <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 border-2 border-green-400/30">
-              <p className="whitespace-pre-wrap leading-relaxed text-gray-100">{currentReadingBook.bookContent}</p>
+
+            <div class="form-group">
+                <label>Your Name:</label>
+                <input type="text" id="checkoutName" readonly>
             </div>
-            <div className="text-center mt-6 text-2xl opacity-70">✨ ⭐ ✨</div>
-          </div>
+            <div class="form-group">
+                <label>Additional Notes (optional):</label>
+                <textarea id="checkoutNotes" rows="3" placeholder="Any special requests or notes..."></textarea>
+            </div>
+            
+            <button class="checkout-btn" onclick="confirmOrder()">✅ Confirm Order</button>
         </div>
-      )}
+    </div>
 
-      {/* Admin Login Modal */}
-      {showAdminLogin && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-5 z-50" onClick={() => setShowAdminLogin(false)}>
-          <div className="bg-white rounded-3xl p-8 max-w-md w-full" onClick={(e) => e.stopPropagation()}>
-            <div className="flex justify-between items-start mb-6">
-              <h2 className="text-3xl font-bold text-purple-600">🔐 Admin Login</h2>
-              <button onClick={() => setShowAdminLogin(false)} className="text-4xl hover:text-gray-600">&times;</button>
+    <!-- Book Reader Modal -->
+    <div id="bookReaderModal" class="modal" onclick="closeModal(event, 'bookReaderModal')">
+        <div class="modal-content" style="max-width: 900px; max-height: 90vh; overflow-y: auto; background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%); color: white; box-shadow: 0 0 50px rgba(102, 126, 234, 0.5);" onclick="event.stopPropagation()">
+            <span class="close-btn" onclick="closeBookReader()" style="color: white;">&times;</span>
+            
+            <div style="text-align: center; padding: 40px 20px;">
+                <div style="font-size: 60px; margin-bottom: 20px; animation: float 3s ease-in-out infinite;">📖</div>
+                <h2 id="readerBookTitle" style="color: #43e97b; margin-bottom: 30px; font-size: 32px; text-shadow: 0 0 20px rgba(67, 233, 123, 0.5);"></h2>
+                
+                <div style="background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(10px); border-radius: 20px; padding: 40px; margin: 20px 0; border: 2px solid rgba(67, 233, 123, 0.3); box-shadow: 0 0 30px rgba(67, 233, 123, 0.2);">
+                    <div id="readerBookContent" style="line-height: 2; font-size: 18px; text-align: left; white-space: pre-wrap; color: #e0e0e0;"></div>
+                </div>
+                
+                <div style="margin-top: 30px; font-size: 24px; opacity: 0.7;">✨ ⭐ ✨</div>
             </div>
-            <div className="mb-6">
-              <label className="block font-semibold mb-2">Enter Admin Password:</label>
-              <input
-                type="password"
-                value={adminPassword}
-                onChange={(e) => setAdminPassword(e.target.value)}
-                placeholder="Enter password"
-                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-purple-500 focus:outline-none"
-              />
-            </div>
-            <button
-              onClick={() => {
-                if (adminPassword === ADMIN_PASSWORD) {
-                  setShowAdminLogin(false);
-                  setShowAdminPanel(true);
-                  setAdminPassword('');
-                  showNotificationMsg('✅ Welcome, Admin!', 'success');
-                } else {
-                  showNotificationMsg('❌ Incorrect password!', 'error');
-                  setTimeout(() => setShowAdminLogin(false), 2000);
+        </div>
+    </div>
+
+    <!-- Notification -->
+    <div id="notification" class="notification"></div>
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+    
+    <script>
+        // Firebase Configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyBxM7Q_example_your_api_key_here",
+            authDomain: "random-park-books.firebaseapp.com",
+            databaseURL: "https://random-park-books-default-rtdb.firebaseio.com",
+            projectId: "random-park-books",
+            storageBucket: "random-park-books.appspot.com",
+            messagingSenderId: "123456789",
+            appId: "1:123456789:web:example"
+        };
+
+        // Initialize Firebase
+        let db;
+        try {
+            firebase.initializeApp(firebaseConfig);
+            db = firebase.database();
+            console.log('✅ Firebase initialized successfully');
+        } catch (error) {
+            console.error('❌ Firebase initialization error:', error);
+            showNotification('⚠️ Running in offline mode - using local storage', 'info');
+        }
+
+        // Admin password
+        const ADMIN_PASSWORD = atob('ZXVyZWth');
+        
+        // Authorized users
+        const AUTHORIZED_USERS = [
+            { first: 'Unown', last: 'S' },
+            { first: 'Anne', last: 'Bell' },
+            { first: 'Cameron', last: 'Hughes' },
+            { first: 'Sophie', last: 'Lambert' },
+            { first: 'Evan', last: 'Morrison' },
+            { first: 'Christian', last: 'Dyer' },
+            { first: 'Nathan', last: 'Marshall' },
+            { first: 'Sebastian', last: 'Graham' },
+            { first: 'Evan', last: 'Henderson' },
+            { first: 'Brandon', last: 'Clark' },
+            { first: 'Carolyn', last: 'Clarkson' },
+            { first: 'Ian', last: 'Fraser' },
+            { first: 'Keith', last: 'Hart' },
+            { first: 'Gabrielle', last: 'Hamilton' },
+            { first: 'Nicola', last: 'Jackson' },
+            { first: 'Joan', last: 'Randall' },
+            { first: 'Alison', last: 'McLean' },
+            { first: 'Irene', last: 'Hudson' },
+            { first: 'Julia', last: 'Ogden' },
+            { first: 'Jason', last: 'Piper' },
+            { first: 'Julian', last: 'Berry' },
+            { first: 'Pippa', last: 'Roberts' },
+            { first: 'Bella', last: 'Davies' },
+            { first: 'Carolyn', last: 'Fisher' },
+            { first: 'Anne', last: 'Clark' },
+            { first: 'Matt', last: 'Gray' },
+            { first: 'Victor', last: 'Bell' },
+            { first: 'Rachel', last: 'Jackson' },
+            { first: 'Jan', last: 'Vaughan' },
+            { first: 'John', last: 'Ball' },
+            { first: 'Phil', last: 'Cameron' }
+        ];
+        
+        function isSpecialAdmin(firstName, lastName) {
+            return firstName.toLowerCase() === 'unown' && lastName.toLowerCase() === 's';
+        }
+        
+        function isAuthorizedUser(firstName, lastName) {
+            return AUTHORIZED_USERS.some(user => 
+                user.first.toLowerCase() === firstName.toLowerCase() && 
+                user.last.toLowerCase() === lastName.toLowerCase()
+            );
+        }
+        
+        // App State
+        let state = {
+            userId: null,
+            name: '',
+            email: '',
+            avatar: '😊',
+            theme: 'purple',
+            cart: [],
+            orders: [],
+            achievements: [],
+            currentFilter: 'all',
+            isSpecialAdmin: false,
+            firstName: '',
+            lastName: '',
+            deliveredBooks: [],
+            rewardPoints: 0,
+            redeemedRewards: []
+        };
+        
+        let books = [];
+        let globalOrders = [];
+        let globalDeliveredBooks = [];
+        let activeSessions = {};
+
+        const themes = {
+            purple: { p: '#667eea', s: '#764ba2' },
+            blue: { p: '#4facfe', s: '#00f2fe' },
+            pink: { p: '#f093fb', s: '#f5576c' },
+            green: { p: '#43e97b', s: '#38f9d7' },
+            orange: { p: '#fa709a', s: '#fee140' },
+            teal: { p: '#30cfd0', s: '#330867' }
+        };
+
+        const achievementsList = [
+            { id: 'first_book', icon: '📖', title: 'First Purchase', desc: 'Buy your first book', condition: () => state.orders.length >= 1 },
+            { id: 'book_lover', icon: '📚', title: 'Book Lover', desc: 'Purchase 5 books', condition: () => state.orders.length >= 5 },
+            { id: 'collector', icon: '🎯', title: 'Collector', desc: 'Purchase 10 books', condition: () => state.orders.length >= 10 },
+            { id: 'digital_fan', icon: '💻', title: 'Digital Fan', desc: 'Buy 3 eBooks', condition: () => state.orders.filter(o => o.items && o.items.some(i => i.type === 'ebook')).length >= 3 },
+            { id: 'physical_fan', icon: '📕', title: 'Physical Fan', desc: 'Buy 3 physical books', condition: () => state.orders.filter(o => o.items && o.items.some(i => i.type === 'physical')).length >= 3 },
+            { id: 'explorer', icon: '🗺️', title: 'Explorer', desc: 'Try both eBooks and physical', condition: () => state.orders.some(o => o.items && o.items.some(i => i.type === 'ebook')) && state.orders.some(o => o.items && o.items.some(i => i.type === 'physical')) },
+            { id: 'bestseller_fan', icon: '🔥', title: 'Bestseller Fan', desc: 'Buy a bestseller book', condition: () => state.orders.some(o => o.items && o.items.some(item => books.find(b => b.title === item.title && b.badge === 'BESTSELLER'))) },
+            { id: 'customizer', icon: '🎨', title: 'Customizer', desc: 'Change your profile settings', condition: () => state.avatar !== '😊' || state.theme !== 'purple' }
+        ];
+
+        const rewardsList = [
+            { id: 'discount_5', icon: '🎫', title: '5% Discount', desc: 'Get 5% off your next purchase', cost: 50, type: 'discount' },
+            { id: 'discount_10', icon: '🎟️', title: '10% Discount', desc: 'Get 10% off your next purchase', cost: 100, type: 'discount' },
+            { id: 'discount_20', icon: '🏷️', title: '20% Discount', desc: 'Get 20% off your next purchase', cost: 200, type: 'discount' },
+            { id: 'free_ebook', icon: '📱', title: 'Free eBook', desc: 'Get any eBook for free', cost: 150, type: 'freebie' },
+            { id: 'free_physical', icon: '📚', title: 'Free Physical Book', desc: 'Get any physical book for free', cost: 300, type: 'freebie' },
+            { id: 'exclusive_badge', icon: '⭐', title: 'VIP Badge', desc: 'Get an exclusive VIP badge', cost: 250, type: 'badge' },
+            { id: 'early_access', icon: '🚀', title: 'Early Access', desc: 'Get early access to new releases', cost: 400, type: 'perk' },
+            { id: 'book_bundle', icon: '🎁', title: 'Book Bundle', desc: 'Get 3 random books', cost: 500, type: 'bundle' }
+        ];
+
+        // Firebase Real-time Functions
+        async function initializeFirebase() {
+            if (!db) {
+                loadLocalData();
+                return;
+            }
+
+            try {
+                // Load books from Firebase
+                db.ref('books').on('value', (snapshot) => {
+                    const data = snapshot.val();
+                    if (data) {
+                        books = Object.values(data);
+                        renderBooks();
+                    } else {
+                        initializeDefaultBooks();
+                    }
+                });
+
+                // Load global orders
+                db.ref('orders').on('value', (snapshot) => {
+                    const data = snapshot.val();
+                    globalOrders = data ? Object.values(data) : [];
+                });
+
+                // Load delivered books
+                db.ref('deliveredBooks').on('value', (snapshot) => {
+                    const data = snapshot.val();
+                    globalDeliveredBooks = data ? Object.values(data) : [];
+                });
+
+                // Monitor active sessions
+                db.ref('activeSessions').on('value', (snapshot) => {
+                    activeSessions = snapshot.val() || {};
+                });
+
+                console.log('✅ Firebase real-time listeners active');
+            } catch (error) {
+                console.error('Firebase initialization error:', error);
+                loadLocalData();
+            }
+        }
+
+        function initializeDefaultBooks() {
+            const defaultBooks = [
+                {
+                    id: 'book1',
+                    title: "Wacky Whispers",
+                    ebook: 4,
+                    physical: 7,
+                    rating: 4.5,
+                    sales: 145,
+                    preview: "Chapter 1: \"Did That Cactus Just Whisper at Me?\"\n\nEllie Voss had been banned from three cactus stores in her town..."
+                },
+                {
+                    id: 'book2',
+                    title: "Life of a Smashkarts Hero",
+                    ebook: 3,
+                    physical: 6,
+                    rating: 4.8,
+                    sales: 289,
+                    popular: true,
+                    preview: "Uggh! Is this how it feels to be in a game! I wish I was back in the customizer..."
+                },
+                {
+                    id: 'book3',
+                    title: "Life of a Ragdoll Hero",
+                    ebook: 3,
+                    physical: 6,
+                    rating: 4.6,
+                    sales: 178,
+                    preview: "Ragdoll, a person in the game of stickman clash, was living life..."
+                },
+                {
+                    id: 'book4',
+                    title: "Adventures of Maple and the Sky Kingdom",
+                    ebook: 6,
+                    physical: 9,
+                    rating: 5.0,
+                    sales: 412,
+                    popular: true,
+                    badge: "BESTSELLER",
+                    preview: "Maple Thistlewhip was not supposed to be in the attic..."
+                },
+                {
+                    id: 'book5',
+                    title: "The Great Sandwich Mystery",
+                    ebook: 6,
+                    physical: 9,
+                    rating: 4.7,
+                    sales: 234,
+                    preview: "Timmy the raccoon opened his lunchbox with ultimate excitement..."
+                },
+                {
+                    id: 'book6',
+                    title: "Puppet Hockey Hero",
+                    ebook: 4,
+                    physical: 7,
+                    rating: 4.4,
+                    sales: 167,
+                    preview: "It was the last day of Puppet School, it was the day we were graduating..."
+                },
+                {
+                    id: 'book7',
+                    title: "Silent Echoes",
+                    ebook: 4,
+                    physical: 7,
+                    rating: 4.9,
+                    sales: 198,
+                    preview: "The small town of Haven's End had never encountered anything remotely like the vast, shimmering dome..."
                 }
-              }}
-              className="w-full py-4 bg-gradient-to-r from-green-400 to-cyan-400 text-white rounded-xl font-bold hover:shadow-lg transition-all"
-            >
-              Login
-            </button>
-          </div>
-        </div>
-      )}
+            ];
 
-      {/* Notification */}
-      {notification.show && (
-        <div
-          className={`fixed top-5 right-5 px-7 py-5 rounded-xl shadow-2xl z-[9999] font-semibold animate-slideIn ${
-            notification.type === 'success' ? 'bg-gradient-to-r from-green-400 to-cyan-400' :
-            notification.type === 'error' ? 'bg-gradient-to-r from-red-500 to-pink-500' :
-            notification.type === 'info' ? 'bg-gradient-to-r from-blue-400 to-cyan-400' :
-            'bg-gradient-to-r from-purple-600 to-pink-600'
-          } text-white max-w-md`}
-        >
-          {notification.message}
-        </div>
-      )}
+            if (db) {
+                defaultBooks.forEach(book => {
+                    db.ref('books/' + book.id).set(book);
+                });
+            } else {
+                books = defaultBooks;
+                saveLocalData();
+            }
+        }
 
-      {/* Admin Panel Modal */}
-      {showAdminPanel && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-5 z-50 overflow-y-auto" onClick={() => setShowAdminPanel(false)}>
-          <div className="bg-white rounded-3xl p-8 max-w-6xl w-full max-h-[90vh] overflow-y-auto my-8" onClick={(e) => e.stopPropagation()}>
-            <div className="flex justify-between items-start mb-6">
-              <h2 className="text-3xl font-bold text-purple-600">👑 Admin Control Panel</h2>
-              <button onClick={() => setShowAdminPanel(false)} className="text-4xl hover:text-gray-600">&times;</button>
-            </div>
+        function loadLocalData() {
+            const saved = localStorage.getItem('randomParkBooks_local');
+            if (saved) {
+                const loaded = JSON.parse(saved);
+                books = loaded.books || [];
+                globalOrders = loaded.orders || [];
+                globalDeliveredBooks = loaded.deliveredBooks || [];
+            }
+            if (books.length === 0) {
+                initializeDefaultBooks();
+            }
+        }
 
-            {/* Admin Tabs */}
-            <div className="flex gap-3 mb-6 flex-wrap">
-              {(['books', 'add', 'orders'] as AdminTab[]).map(tab => (
-                <button
-                  key={tab}
-                  onClick={() => setAdminTab(tab)}
-                  className={`px-6 py-3 rounded-xl font-semibold transition-all ${
-                    adminTab === tab
-                      ? 'bg-purple-600 text-white'
-                      : 'border-2 border-purple-600 text-purple-600 hover:bg-purple-50'
-                  }`}
-                >
-                  {tab === 'books' && '📚 Manage Books'}
-                  {tab === 'add' && '➕ Add Book'}
-                  {tab === 'orders' && '📧 Orders'}
-                </button>
-              ))}
-            </div>
+        function saveLocalData() {
+            localStorage.setItem('randomParkBooks_local', JSON.stringify({
+                books,
+                orders: globalOrders,
+                deliveredBooks: globalDeliveredBooks
+            }));
+        }
 
-            {/* Manage Books Tab */}
-            {adminTab === 'books' && (
-              <div>
-                <h3 className="text-xl font-bold text-purple-600 mb-4">All Books</h3>
-                <div className="space-y-3 max-h-[500px] overflow-y-auto">
-                  {books.map((book, index) => (
-                    <div key={book.id} className="p-4 bg-gray-50 rounded-xl">
-                      <h4 className="font-bold mb-2">
-                        {book.title}
-                        {book.badge && <span className="ml-2 px-2 py-1 bg-red-500 text-white text-xs rounded-full">{book.badge}</span>}
-                      </h4>
-                      <p className="text-sm text-gray-600 mb-2">
-                        eBook: ${book.ebook} | Physical: ${book.physical} | Rating: {book.rating}⭐ | Sales: {book.sales}
-                      </p>
-                      {book.popular && <p className="text-sm text-red-500">🔥 Popular</p>}
-                      <div className="flex gap-2 mt-3">
-                        <button
-                          onClick={() => {
-                            setNewBook({
-                              title: book.title,
-                              ebook: book.ebook,
-                              physical: book.physical,
-                              rating: book.rating,
-                              sales: book.sales,
-                              badge: book.badge || '',
-                              popular: book.popular || false,
-                              preview: book.preview
-                            });
-                            if (db) {
-                              remove(ref(db, 'books/' + book.id));
-                            }
-                            setAdminTab('add');
-                            showNotificationMsg('✏️ Edit mode - Update and click Add Book', 'info');
-                          }}
-                          className="px-4 py-2 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700"
-                        >
-                          ✏️ Edit
+        async function saveUserData() {
+            if (!state.userId) return;
+
+            const userData = {
+                name: state.name,
+                email: state.email,
+                avatar: state.avatar,
+                theme: state.theme,
+                cart: state.cart,
+                orders: state.orders,
+                achievements: state.achievements,
+                rewardPoints: state.rewardPoints,
+                redeemedRewards: state.redeemedRewards,
+                lastUpdated: Date.now()
+            };
+
+            if (db) {
+                try {
+                    await db.ref('users/' + state.userId).set(userData);
+                } catch (error) {
+                    console.error('Error saving user data:', error);
+                    localStorage.setItem('randomParkBooks_user_' + state.userId, JSON.stringify(userData));
+                }
+            } else {
+                localStorage.setItem('randomParkBooks_user_' + state.userId, JSON.stringify(userData));
+            }
+        }
+
+        async function loadUserData(userId) {
+            if (db) {
+                try {
+                    const snapshot = await db.ref('users/' + userId).once('value');
+                    const data = snapshot.val();
+                    if (data) {
+                        Object.assign(state, data);
+                    }
+                } catch (error) {
+                    console.error('Error loading user data:', error);
+                    const saved = localStorage.getItem('randomParkBooks_user_' + userId);
+                    if (saved) {
+                        Object.assign(state, JSON.parse(saved));
+                    }
+                }
+            } else {
+                const saved = localStorage.getItem('randomParkBooks_user_' + userId);
+                if (saved) {
+                    Object.assign(state, JSON.parse(saved));
+                }
+            }
+        }
+
+        async function checkActiveSession(firstName, lastName) {
+            const sessionKey = `${firstName.toLowerCase()}_${lastName.toLowerCase()}`;
+            
+            if (db) {
+                try {
+                    const snapshot = await db.ref('activeSessions/' + sessionKey).once('value');
+                    return snapshot.val() !== null;
+                } catch (error) {
+                    console.error('Error checking session:', error);
+                    return false;
+                }
+            }
+            return false;
+        }
+
+        async function createSession(firstName, lastName) {
+            const sessionKey = `${firstName.toLowerCase()}_${lastName.toLowerCase()}`;
+            const sessionData = {
+                firstName,
+                lastName,
+                loginTime: Date.now()
+            };
+
+            if (db) {
+                try {
+                    await db.ref('activeSessions/' + sessionKey).set(sessionData);
+                    
+                    // Set up disconnect handler
+                    db.ref('activeSessions/' + sessionKey).onDisconnect().remove();
+                } catch (error) {
+                    console.error('Error creating session:', error);
+                }
+            }
+        }
+
+        async function removeSession(firstName, lastName) {
+            const sessionKey = `${firstName.toLowerCase()}_${lastName.toLowerCase()}`;
+            
+            if (db) {
+                try {
+                    await db.ref('activeSessions/' + sessionKey).remove();
+                } catch (error) {
+                    console.error('Error removing session:', error);
+                }
+            }
+        }
+
+        // Welcome Screen Functions
+        function selectAvatar(btn, emoji) {
+            document.querySelectorAll('.welcome-box .avatar-btn, #profileModal .avatar-btn').forEach(b => {
+                if (b.closest('.welcome-box') === btn.closest('.welcome-box') || 
+                    b.closest('#profileModal') === btn.closest('#profileModal')) {
+                    b.classList.remove('selected');
+                }
+            });
+            btn.classList.add('selected');
+            state.avatar = emoji;
+        }
+
+        function selectColor(btn, color) {
+            document.querySelectorAll('.welcome-box .color-btn, #profileModal .color-btn').forEach(b => {
+                if (b.closest('.welcome-box') === btn.closest('.welcome-box') || 
+                    b.closest('#profileModal') === btn.closest('#profileModal')) {
+                    b.classList.remove('selected');
+                }
+            });
+            btn.classList.add('selected');
+            state.theme = color;
+        }
+
+        async function startApp() {
+            const firstName = document.getElementById('firstName').value.trim();
+            const lastName = document.getElementById('lastName').value.trim();
+            
+            if (!firstName || !lastName) {
+                showNotification('❌ Please enter your first and last name!', 'error');
+                return;
+            }
+            
+            if (!isAuthorizedUser(firstName, lastName)) {
+                showNotification('❌ You are not authorized to access this store!', 'error');
+                return;
+            }
+            
+            if (isSpecialAdmin(firstName, lastName)) {
+                const password = prompt('🔐 Admin password required for Unown S:');
+                if (password !== ADMIN_PASSWORD) {
+                    showNotification('❌ Incorrect admin password!', 'error');
+                    return;
+                }
+            }
+            
+            // Check for active session
+            const hasActiveSession = await checkActiveSession(firstName, lastName);
+            if (hasActiveSession) {
+                showNotification('❌ This user is already logged in! Only one session allowed per user.', 'error');
+                return;
+            }
+            
+            // Create user ID
+            state.userId = `${firstName.toLowerCase()}_${lastName.toLowerCase()}`;
+            state.name = `${firstName} ${lastName}`;
+            state.email = `${firstName.toLowerCase()}.${lastName.toLowerCase()}@randomparkbooks.com`;
+            state.isSpecialAdmin = isSpecialAdmin(firstName, lastName);
+            state.firstName = firstName;
+            state.lastName = lastName;
+            
+            // Create session
+            await createSession(firstName, lastName);
+            
+            // Load user data
+            await loadUserData(state.userId);
+            
+            document.getElementById('welcomeScreen').style.display = 'none';
+            document.getElementById('mainApp').style.display = 'block';
+            document.getElementById('displayName').textContent = state.name;
+            document.getElementById('userAvatar').textContent = state.avatar;
+            
+            applyTheme();
+            renderBooks();
+            updateDisplay();
+            
+            if (state.isSpecialAdmin) {
+                showNotification('👑 Welcome, Unown S! Real-time sync active.', 'success');
+            } else {
+                showNotification(`👋 Welcome back, ${firstName}! Real-time sync active.`, 'success');
+            }
+        }
+
+        async function logout() {
+            if (!confirm('Are you sure you want to logout?')) return;
+            
+            closeProfile();
+            
+            // Remove session
+            if (state.firstName && state.lastName) {
+                await removeSession(state.firstName, state.lastName);
+            }
+            
+            // Save before logout
+            await saveUserData();
+            
+            // Reset state
+            const userId = state.userId;
+            state = {
+                userId: null,
+                name: '',
+                email: '',
+                avatar: '😊',
+                theme: 'purple',
+                cart: [],
+                orders: [],
+                achievements: [],
+                currentFilter: 'all',
+                isSpecialAdmin: false,
+                firstName: '',
+                lastName: '',
+                deliveredBooks: [],
+                rewardPoints: 0,
+                redeemedRewards: []
+            };
+            
+            document.getElementById('firstName').value = '';
+            document.getElementById('lastName').value = '';
+            
+            document.getElementById('mainApp').style.display = 'none';
+            document.getElementById('welcomeScreen').style.display = 'flex';
+            
+            showNotification('👋 Logged out successfully!', 'success');
+        }
+
+        function applyTheme() {
+            const t = themes[state.theme];
+            document.body.style.background = `linear-gradient(135deg, ${t.p} 0%, ${t.s} 100%)`;
+            
+            const existingStyle = document.getElementById('themeStyle');
+            if (existingStyle) existingStyle.remove();
+            
+            const style = document.createElement('style');
+            style.id = 'themeStyle';
+            style.innerHTML = `
+                .logo { background: linear-gradient(135deg, ${t.p} 0%, ${t.s} 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+                .stat-box { background: linear-gradient(135deg, ${t.p} 0%, ${t.s} 100%); }
+                .banner { background: linear-gradient(135deg, ${t.p} 0%, ${t.s} 100%); }
+                .filter-btn { border-color: ${t.p}; color: ${t.p}; }
+                .filter-btn.active { background: ${t.p}; }
+                .search-box:focus { border-color: ${t.p}; box-shadow: 0 0 0 3px ${t.p}33; }
+                .book-card::before { background: linear-gradient(135deg, ${t.p} 0%, ${t.s} 100%); }
+                .price-option { background: linear-gradient(135deg, ${t.p} 0%, ${t.s} 100%); }
+                .add-ebook { background: linear-gradient(135deg, ${t.p} 0%, ${t.s} 100%); }
+                .preview-btn { border-color: ${t.p}; color: ${t.p}; }
+                .preview-btn:hover { background: ${t.p}; }
+                .cart h3 { color: ${t.p}; }
+                .notification { background: linear-gradient(135deg, ${t.p} 0%, ${t.s} 100%); }
+                .admin-tab { border-color: ${t.p}; color: ${t.p}; }
+                .admin-tab.active { background: ${t.p}; }
+            `;
+            document.head.appendChild(style);
+        }
+
+        function renderBooks() {
+            const search = document.getElementById('searchBox')?.value.toLowerCase() || '';
+            const filtered = books.filter(book => {
+                const matchSearch = book.title.toLowerCase().includes(search);
+                if (!matchSearch) return false;
+                
+                if (state.currentFilter === 'all') return true;
+                if (state.currentFilter === 'popular') return book.popular;
+                if (state.currentFilter === 'ebook') return true;
+                if (state.currentFilter === 'physical') return true;
+                
+                return true;
+            });
+
+            const gridElement = document.getElementById('booksGrid');
+            if (!gridElement) return;
+
+            gridElement.innerHTML = filtered.map((book, i) => {
+                const stars = '⭐'.repeat(Math.floor(book.rating));
+                const half = book.rating % 1 >= 0.5 ? '⭐' : '';
+                
+                return `
+                    <div class="book-card ${book.badge ? 'featured' : ''}">
+                        <div class="book-rating">${stars}${half} (${book.rating})</div>
+                        <div class="book-title">
+                            ${book.title}
+                            ${book.badge ? `<span class="badge">${book.badge}</span>` : ''}
+                        </div>
+                        <div class="book-meta">
+                            <span>📦 ${book.sales} sold</span>
+                            ${book.popular ? '<span style="color: #f5576c;">🔥 Trending</span>' : ''}
+                        </div>
+                        <div class="book-prices">
+                            <div class="price-option">
+                                <div class="price-label">eBook</div>
+                                <div class="price-value">${book.ebook}</div>
+                            </div>
+                            <div class="price-option">
+                                <div class="price-label">Physical</div>
+                                <div class="price-value">${book.physical}</div>
+                            </div>
+                        </div>
+                        <div class="buy-buttons">
+                            <button class="buy-btn add-ebook" onclick="addToCart(${i}, 'ebook')">
+                                🛒 Add eBook
+                            </button>
+                            <button class="buy-btn add-physical" onclick="addToCart(${i}, 'physical')">
+                                🛒 Add Physical
+                            </button>
+                        </div>
+                        <button class="preview-btn" onclick="showPreview(${i})">
+                            👁️ Read Preview
                         </button>
-                        <button
-                          onClick={async () => {
-                            if (window.confirm(`Delete "${book.title}"?`)) {
-                              if (db) {
-                                await remove(ref(db, 'books/' + book.id));
-                              } else {
-                                setBooks(books.filter((_, i) => i !== index));
-                                saveLocalData();
-                              }
-                              showNotificationMsg(`🗑️ "${book.title}" deleted!`, 'success');
-                            }
-                          }}
-                          className="px-4 py-2 bg-red-500 text-white rounded-lg font-semibold hover:bg-red-600"
-                        >
-                          🗑️ Delete
-                        </button>
-                      </div>
                     </div>
-                  ))}
-                </div>
-              </div>
-            )}
+                `;
+            }).join('');
+        }
 
-            {/* Add Book Tab */}
-            {adminTab === 'add' && (
-              <div>
-                <h3 className="text-xl font-bold text-purple-600 mb-4">Add New Book</h3>
-                <div className="space-y-4">
-                  <div>
-                    <label className="block font-semibold mb-2">Book Title:</label>
-                    <input
-                      type="text"
-                      value={newBook.title}
-                      onChange={(e) => setNewBook({...newBook, title: e.target.value})}
-                      className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-purple-500 focus:outline-none"
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
+        function addToCart(index, type) {
+            const book = books[index];
+            const price = type === 'ebook' ? book.ebook : book.physical;
+            
+            state.cart.push({
+                title: book.title,
+                type: type,
+                price: price
+            });
+            
+            showNotification(`✅ Added "${book.title}" (${type}) to cart!`, 'success');
+            updateDisplay();
+            saveUserData();
+        }
+
+        function removeFromCart(index) {
+            const item = state.cart[index];
+            state.cart.splice(index, 1);
+            updateDisplay();
+            saveUserData();
+            showNotification(`🗑️ Removed "${item.title}" from cart`, 'info');
+        }
+
+        function showPreview(index) {
+            const book = books[index];
+            document.getElementById('previewTitle').textContent = book.title;
+            document.getElementById('previewText').textContent = book.preview;
+            document.getElementById('previewModal').style.display = 'block';
+        }
+
+        function closePreview() {
+            document.getElementById('previewModal').style.display = 'none';
+        }
+
+        function setFilter(filter) {
+            state.currentFilter = filter;
+            document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+            renderBooks();
+        }
+
+        function filterBooks() {
+            renderBooks();
+        }
+
+        function updateDisplay() {
+            const cartDiv = document.getElementById('cartItems');
+            if (!cartDiv) return;
+
+            if (state.cart.length === 0) {
+                cartDiv.innerHTML = '<p style="color: #999;">Your cart is empty. Add some books!</p>';
+                const checkoutBtn = document.getElementById('checkoutBtn');
+                if (checkoutBtn) checkoutBtn.disabled = true;
+            } else {
+                cartDiv.innerHTML = state.cart.map((item, index) => `
+                    <div class="cart-item">
+                        <div>
+                            <strong>${item.title}</strong><br>
+                            <small style="color: #666;">${item.type} • ${item.price}</small>
+                        </div>
+                        <button class="remove-item" onclick="removeFromCart(${index})">Remove</button>
+                    </div>
+                `).join('');
+                const checkoutBtn = document.getElementById('checkoutBtn');
+                if (checkoutBtn) checkoutBtn.disabled = false;
+            }
+            
+            const totalItems = document.getElementById('totalItems');
+            const ebookCount = document.getElementById('ebookCount');
+            const physicalCount = document.getElementById('physicalCount');
+            
+            if (totalItems) totalItems.textContent = state.cart.length;
+            if (ebookCount) ebookCount.textContent = state.cart.filter(i => i.type === 'ebook').length;
+            if (physicalCount) physicalCount.textContent = state.cart.filter(i => i.type === 'physical').length;
+            
+            updateAchievements();
+        }
+
+        function updateAchievements() {
+            const unlocked = achievementsList.filter(a => a.condition()).map(a => a.id);
+            state.achievements = unlocked;
+            const countElem = document.getElementById('achievementCount');
+            const totalElem = document.getElementById('totalAchievements');
+            if (countElem) countElem.textContent = unlocked.length;
+            if (totalElem) totalElem.textContent = achievementsList.length;
+        }
+
+        async function proceedToCheckout() {
+            if (state.cart.length === 0) return;
+            
+            document.getElementById('checkoutName').value = state.name;
+            
+            const summary = state.cart.map(item => 
+                `<div style="padding: 8px 0; border-bottom: 1px solid #ddd;">
+                    <strong>${item.title}</strong> (${item.type}) - ${item.price}
+                </div>`
+            ).join('');
+            
+            const total = state.cart.reduce((sum, item) => sum + item.price, 0);
+            
+            document.getElementById('checkoutSummary').innerHTML = summary + 
+                `<div style="padding: 12px 0; font-weight: bold; font-size: 18px;">
+                    Total: ${total}
+                </div>`;
+            
+            document.getElementById('checkoutModal').style.display = 'block';
+        }
+
+        async function confirmOrder() {
+            const notes = document.getElementById('checkoutNotes').value;
+            
+            if (state.cart.length === 0) {
+                showNotification('❌ Your cart is empty!', 'error');
+                return;
+            }
+            
+            const order = {
+                id: Date.now(),
+                name: state.name,
+                email: state.email,
+                items: [...state.cart],
+                notes: notes,
+                date: new Date().toLocaleString(),
+                total: state.cart.reduce((sum, item) => sum + item.price, 0)
+            };
+            
+            state.orders.push(order);
+            
+            // Save to Firebase
+            if (db) {
+                try {
+                    await db.ref('orders/' + order.id).set(order);
+                } catch (error) {
+                    console.error('Error saving order:', error);
+                }
+            } else {
+                globalOrders.push(order);
+                saveLocalData();
+            }
+            
+            const pointsEarned = Math.floor(order.total * 10);
+            state.rewardPoints += pointsEarned;
+            
+            // Update book sales
+            for (const item of state.cart) {
+                const bookIndex = books.findIndex(b => b.title === item.title);
+                if (bookIndex !== -1) {
+                    books[bookIndex].sales++;
+                    
+                    if (db) {
+                        try {
+                            await db.ref('books/' + books[bookIndex].id + '/sales').set(books[bookIndex].sales);
+                        } catch (error) {
+                            console.error('Error updating sales:', error);
+                        }
+                    }
+                }
+            }
+            
+            state.cart = [];
+            
+            await saveUserData();
+            if (!db) saveLocalData();
+            
+            closeCheckout();
+            
+            showNotification(`✅ Order confirmed! You earned ${pointsEarned} reward points! 🎁`, 'success');
+            
+            updateDisplay();
+            renderBooks();
+            updateAchievements();
+        }
+
+        function closeCheckout() {
+            document.getElementById('checkoutModal').style.display = 'none';
+        }
+
+        function showProfile() {
+            document.getElementById('profileName').value = state.name;
+            document.getElementById('profileRewardPoints').textContent = state.rewardPoints;
+            
+            const ordersToShow = state.isSpecialAdmin ? globalOrders : state.orders;
+            
+            if (state.isSpecialAdmin) {
+                document.getElementById('ordersHeader').textContent = '👑 All Customer Orders';
+                document.getElementById('profilePurchases').textContent = globalOrders.length;
+            } else {
+                document.getElementById('ordersHeader').textContent = '📦 Your Orders';
+                document.getElementById('profilePurchases').textContent = state.orders.length;
+            }
+            
+            const ordersList = document.getElementById('profileOrdersList');
+            
+            if (ordersToShow.length === 0) {
+                ordersList.innerHTML = '<p style="color: #999; padding: 20px; text-align: center;">No orders yet.</p>';
+            } else {
+                ordersList.innerHTML = ordersToShow.slice().reverse().map(order => `
+                    <div class="admin-book-item" style="margin-top: 15px;">
+                        <div>
+                            <h4>Order #${order.id}</h4>
+                            ${state.isSpecialAdmin ? `<p style="color: #f5576c; margin: 5px 0; font-weight: bold;">
+                                👤 Customer: ${order.name} (${order.email})
+                            </p>` : ''}
+                            <p style="color: #666; margin: 5px 0;">
+                                <strong>Date:</strong> ${order.date}
+                            </p>
+                            <p style="color: #666; margin: 5px 0;">
+                                <strong>Total:</strong> ${order.total}
+                            </p>
+                            <p style="color: #666; margin: 5px 0;">
+                                <strong>Items:</strong>
+                            </p>
+                            <ul style="margin-left: 20px; color: #666;">
+                                ${order.items.map(item => `<li>${item.title} (${item.type}) - ${item.price}</li>`).join('')}
+                            </ul>
+                            ${order.notes ? `<p style="color: #999; margin: 5px 0; font-style: italic;"><strong>Notes:</strong> ${order.notes}</p>` : ''}
+                        </div>
+                    </div>
+                `).join('');
+            }
+            
+            const userDeliveredBooks = globalDeliveredBooks.filter(book => 
+                book.customerName.toLowerCase() === state.name.toLowerCase()
+            );
+            
+            const deliveredBooksSection = document.getElementById('deliveredBooksSection');
+            const deliveredBooksList = document.getElementById('profileDeliveredBooks');
+            
+            if (userDeliveredBooks.length > 0) {
+                deliveredBooksSection.style.display = 'block';
+                deliveredBooksList.innerHTML = userDeliveredBooks.map(book => `
+                    <div class="admin-book-item" style="margin-top: 15px; background: linear-gradient(135deg, #43e97b22 0%, #38f9d722 100%); border: 2px solid #43e97b;">
+                        <div>
+                            <h4>📖 ${book.bookTitle}</h4>
+                            <p style="color: #666; margin: 5px 0;">
+                                <strong>Delivered:</strong> ${book.date}
+                            </p>
+                            <button class="checkout-btn" style="margin-top: 10px; padding: 10px 20px;" onclick="readDeliveredBook('${book.id}')">
+                                📚 Read Book
+                            </button>
+                        </div>
+                    </div>
+                `).join('');
+            } else {
+                deliveredBooksSection.style.display = 'none';
+            }
+            
+            document.querySelectorAll('#profileModal .avatar-btn').forEach(btn => {
+                btn.classList.remove('selected');
+                if (btn.textContent === state.avatar) {
+                    btn.classList.add('selected');
+                }
+            });
+            
+            const themeColors = {
+                purple: 0, blue: 1, pink: 2, green: 3, orange: 4, teal: 5
+            };
+            document.querySelectorAll('#profileModal .color-btn').forEach((btn, i) => {
+                btn.classList.remove('selected');
+                if (i === themeColors[state.theme]) {
+                    btn.classList.add('selected');
+                }
+            });
+            
+            document.getElementById('profileModal').style.display = 'block';
+        }
+
+        function readDeliveredBook(bookId) {
+            const book = globalDeliveredBooks.find(b => b.id == bookId);
+            if (!book) {
+                showNotification('❌ Book not found!', 'error');
+                return;
+            }
+            
+            document.getElementById('readerBookTitle').textContent = book.bookTitle;
+            document.getElementById('readerBookContent').textContent = book.bookContent;
+            document.getElementById('bookReaderModal').style.display = 'block';
+            
+            closeProfile();
+            
+            showNotification('📖 Enjoy your book!', 'success');
+        }
+
+        function closeProfile() {
+            document.getElementById('profileModal').style.display = 'none';
+        }
+
+        function closeBookReader() {
+            document.getElementById('bookReaderModal').style.display = 'none';
+        }
+
+        async function updateProfile() {
+            const newName = document.getElementById('profileName').value.trim();
+            if (!newName) {
+                showNotification('❌ Name cannot be empty!', 'error');
+                return;
+            }
+            state.name = newName;
+            document.getElementById('displayName').textContent = state.name;
+            await saveUserData();
+            showNotification('✅ Profile updated!', 'success');
+        }
+
+        async function updateAvatar(btn, emoji) {
+            selectAvatar(btn, emoji);
+            document.getElementById('userAvatar').textContent = emoji;
+            await saveUserData();
+            showNotification('✅ Avatar updated!', 'success');
+            updateAchievements();
+        }
+
+        async function updateTheme(btn, theme) {
+            selectColor(btn, theme);
+            applyTheme();
+            await saveUserData();
+            showNotification('✅ Theme updated!', 'success');
+            updateAchievements();
+        }
+
+        function showAchievements() {
+            const list = document.getElementById('achievementsList');
+            list.innerHTML = achievementsList.map(achievement => {
+                const unlocked = state.achievements.includes(achievement.id);
+                return `
+                    <div class="achievement ${unlocked ? 'unlocked' : ''}">
+                        <div class="achievement-icon">${achievement.icon}</div>
+                        <div class="achievement-title">${achievement.title}</div>
+                        <div class="achievement-desc">${achievement.desc}</div>
+                        ${unlocked ? '<div style="margin-top: 10px; font-weight: bold;">✅ Unlocked</div>' : '<div style="margin-top: 10px; opacity: 0.5;">🔒 Locked</div>'}
+                    </div>
+                `;
+            }).join('');
+            
+            document.getElementById('achievementsModal').style.display = 'block';
+        }
+
+        function closeAchievements() {
+            document.getElementById('achievementsModal').style.display = 'none';
+        }
+
+        function showRewards() {
+            document.getElementById('rewardPoints').textContent = state.rewardPoints;
+            
+            const list = document.getElementById('rewardsList');
+            list.innerHTML = rewardsList.map(reward => {
+                const redeemed = state.redeemedRewards.includes(reward.id);
+                const canAfford = state.rewardPoints >= reward.cost;
+                
+                return `
+                    <div class="achievement ${redeemed ? 'unlocked' : ''}">
+                        <div class="achievement-icon">${reward.icon}</div>
+                        <div class="achievement-title">${reward.title}</div>
+                        <div class="achievement-desc">${reward.desc}</div>
+                        <div style="margin-top: 10px; font-weight: bold; font-size: 18px;">
+                            ${reward.cost} Points
+                        </div>
+                        ${redeemed ? 
+                            '<div style="margin-top: 10px; font-weight: bold;">✅ Redeemed</div>' : 
+                            `<button class="buy-btn add-ebook" style="margin-top: 10px; padding: 8px 16px; ${!canAfford ? 'opacity: 0.5; cursor: not-allowed;' : ''}" 
+                                onclick="redeemReward('${reward.id}')" 
+                                ${!canAfford ? 'disabled' : ''}>
+                                ${canAfford ? '🎁 Redeem' : '🔒 Locked'}
+                            </button>`
+                        }
+                    </div>
+                `;
+            }).join('');
+            
+            document.getElementById('rewardsModal').style.display = 'block';
+        }
+
+        function closeRewards() {
+            document.getElementById('rewardsModal').style.display = 'none';
+        }
+
+        async function redeemReward(rewardId) {
+            const reward = rewardsList.find(r => r.id === rewardId);
+            
+            if (!reward) return;
+            
+            if (state.rewardPoints < reward.cost) {
+                showNotification('❌ Not enough points!', 'error');
+                return;
+            }
+            
+            if (state.redeemedRewards.includes(rewardId)) {
+                showNotification('❌ Already redeemed!', 'error');
+                return;
+            }
+            
+            if (!confirm(`Redeem "${reward.title}" for ${reward.cost} points?`)) return;
+            
+            state.rewardPoints -= reward.cost;
+            state.redeemedRewards.push(rewardId);
+            
+            await saveUserData();
+            showRewards();
+            
+            showNotification(`🎉 Successfully redeemed: ${reward.title}!`, 'success');
+        }
+
+        function openAdminLogin() {
+            document.getElementById('adminPassword').value = '';
+            document.getElementById('adminLoginModal').style.display = 'block';
+        }
+
+        function closeAdminLogin() {
+            document.getElementById('adminLoginModal').style.display = 'none';
+        }
+
+        function checkAdminPassword() {
+            const password = document.getElementById('adminPassword').value;
+            
+            if (password === ADMIN_PASSWORD) {
+                closeAdminLogin();
+                openAdminPanel();
+                showNotification('✅ Welcome, Admin!', 'success');
+            } else {
+                showNotification('❌ Incorrect password!', 'error');
+                setTimeout(() => {
+                    closeAdminLogin();
+                }, 2000);
+            }
+        }
+
+        function openAdminPanel() {
+            loadAdminBooks();
+            loadAdminOrders();
+            populateBookDropdown();
+            document.getElementById('adminPanel').style.display = 'block';
+        }
+
+        function closeAdminPanel() {
+            document.getElementById('adminPanel').style.display = 'none';
+        }
+
+        function showAdminTab(tab) {
+            document.querySelectorAll('.admin-tab').forEach(t => t.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            document.querySelectorAll('.admin-section').forEach(s => s.classList.remove('active'));
+            
+            if (tab === 'books') {
+                document.getElementById('adminBooksSection').classList.add('active');
+                loadAdminBooks();
+            } else if (tab === 'add') {
+                document.getElementById('adminAddSection').classList.add('active');
+            } else if (tab === 'orders') {
+                document.getElementById('adminOrdersSection').classList.add('active');
+                loadAdminOrders();
+                populateBookDropdown();
+            }
+        }
+
+        function populateBookDropdown() {
+            const select = document.getElementById('deliverBookSelect');
+            select.innerHTML = '<option value="">-- Choose a book --</option>' + 
+                books.map((book, index) => `<option value="${index}">${book.title}</option>`).join('');
+        }
+
+        async function deliverBookToCustomer() {
+            const customerName = document.getElementById('deliverCustomerName').value.trim();
+            const bookIndex = document.getElementById('deliverBookSelect').value;
+            const bookContent = document.getElementById('deliverBookContent').value.trim();
+            
+            if (!customerName) {
+                showNotification('❌ Please enter a customer name!', 'error');
+                return;
+            }
+            
+            if (bookIndex === '') {
+                showNotification('❌ Please select a book!', 'error');
+                return;
+            }
+            
+            if (!bookContent) {
+                showNotification('❌ Please enter the book content!', 'error');
+                return;
+            }
+            
+            const book = books[parseInt(bookIndex)];
+            
+            const deliveredBook = {
+                id: Date.now(),
+                customerName: customerName,
+                bookTitle: book.title,
+                bookContent: bookContent,
+                date: new Date().toLocaleString()
+            };
+            
+            if (db) {
+                try {
+                    await db.ref('deliveredBooks/' + deliveredBook.id).set(deliveredBook);
+                    showNotification(`✅ "${book.title}" delivered to ${customerName}!`, 'success');
+                } catch (error) {
+                    console.error('Error delivering book:', error);
+                    showNotification('❌ Failed to deliver book. Try again.', 'error');
+                }
+            } else {
+                globalDeliveredBooks.push(deliveredBook);
+                saveLocalData();
+                showNotification(`✅ "${book.title}" delivered to ${customerName}!`, 'success');
+            }
+            
+            document.getElementById('deliverCustomerName').value = '';
+            document.getElementById('deliverBookSelect').value = '';
+            document.getElementById('deliverBookContent').value = '';
+        }
+
+        function loadAdminBooks() {
+            const list = document.getElementById('adminBooksList');
+            list.innerHTML = books.map((book, index) => `
+                <div class="admin-book-item">
                     <div>
-                      <label className="block font-semibold mb-2">eBook Price ($):</label>
-                      <input
-                        type="number"
-                        value={newBook.ebook}
-                        onChange={(e) => setNewBook({...newBook, ebook: parseFloat(e.target.value)})}
-                        className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-purple-500 focus:outline-none"
-                      />
+                        <h4>${book.title} ${book.badge ? `<span class="badge">${book.badge}</span>` : ''}</h4>
+                        <p style="color: #666; margin: 5px 0;">
+                            eBook: ${book.ebook} | Physical: ${book.physical} | 
+                            Rating: ${book.rating}⭐ | Sales: ${book.sales}
+                        </p>
+                        <p style="color: #999; font-size: 13px; margin-top: 5px;">
+                            ${book.popular ? '🔥 Popular' : ''}
+                        </p>
                     </div>
-                    <div>
-                      <label className="block font-semibold mb-2">Physical Price ($):</label>
-                      <input
-                        type="number"
-                        value={newBook.physical}
-                        onChange={(e) => setNewBook({...newBook, physical: parseFloat(e.target.value)})}
-                        className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-purple-500 focus:outline-none"
-                      />
+                    <div class="admin-actions">
+                        <button class="admin-btn admin-btn-edit" onclick="editBook(${index})">✏️ Edit</button>
+                        <button class="admin-btn admin-btn-delete" onclick="deleteBook(${index})">🗑️ Delete</button>
                     </div>
-                  </div>
-                  <div>
-                    <label className="block font-semibold mb-2">Rating (0-5):</label>
-                    <input
-                      type="number"
-                      step="0.1"
-                      min="0"
-                      max="5"
-                      value={newBook.rating}
-                      onChange={(e) => setNewBook({...newBook, rating: parseFloat(e.target.value)})}
-                      className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-purple-500 focus:outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="block font-semibold mb-2">Sales Count:</label>
-                    <input
-                      type="number"
-                      value={newBook.sales}
-                      onChange={(e) => setNewBook({...newBook, sales: parseInt(e.target.value)})}
-                      className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-purple-500 focus:outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="block font-semibold mb-2">Badge (optional):</label>
-                    <input
-                      type="text"
-                      value={newBook.badge}
-                      onChange={(e) => setNewBook({...newBook, badge: e.target.value})}
-                      placeholder="e.g., BESTSELLER, NEW"
-                      className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-purple-500 focus:outline-none"
-                    />
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      id="popular"
-                      checked={newBook.popular}
-                      onChange={(e) => setNewBook({...newBook, popular: e.target.checked})}
-                      className="w-5 h-5"
-                    />
-                    <label htmlFor="popular" className="font-semibold">Mark as Popular</label>
-                  </div>
-                  <div>
-                    <label className="block font-semibold mb-2">Book Preview:</label>
-                    <textarea
-                      value={newBook.preview}
-                      onChange={(e) => setNewBook({...newBook, preview: e.target.value})}
-                      rows={5}
-                      className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-purple-500 focus:outline-none"
-                    />
-                  </div>
-                  <button
-                    onClick={async () => {
-                      if (!newBook.title || !newBook.preview) {
-                        showNotificationMsg('❌ Please fill in title and preview!', 'error');
-                        return;
-                      }
-                      if (newBook.rating < 0 || newBook.rating > 5) {
-                        showNotificationMsg('❌ Rating must be between 0 and 5!', 'error');
-                        return;
-                      }
-
-                      const bookToAdd: Book = {
-                        id: 'book_' + Date.now(),
-                        title: newBook.title,
-                        ebook: newBook.ebook,
-                        physical: newBook.physical,
-                        rating: newBook.rating,
-                        sales: newBook.sales,
-                        preview: newBook.preview,
-                        badge: newBook.badge || undefined,
-                        popular: newBook.popular
-                      };
-
-                      if (db) {
-                        await set(ref(db, 'books/' + bookToAdd.id), bookToAdd);
-                      } else {
-                        setBooks([...books, bookToAdd]);
-                        saveLocalData();
-                      }
-
-                      setNewBook({
-                        title: '',
-                        ebook: 5,
-                        physical: 10,
-                        rating: 4.5,
-                        sales: 0,
-                        badge: '',
-                        popular: false,
-                        preview: ''
-                      });
-                      showNotificationMsg('✅ Book added successfully!', 'success');
-                    }}
-                    className="w-full py-4 bg-gradient-to-r from-green-400 to-cyan-400 text-white rounded-xl font-bold hover:shadow-lg transition-all"
-                  >
-                    Add Book
-                  </button>
                 </div>
-              </div>
-            )}
+            `).join('');
+        }
 
-            {/* Orders Tab */}
-            {adminTab === 'orders' && (
-              <div>
-                <h3 className="text-xl font-bold text-purple-600 mb-4">Customer Orders</h3>
-                {globalOrders.length === 0 ? (
-                  <p className="text-gray-400 text-center py-4">No orders yet.</p>
-                ) : (
-                  <div className="space-y-3 max-h-[300px] overflow-y-auto mb-8">
-                    {globalOrders.slice().reverse().map(order => (
-                      <div key={order.id} className="p-4 bg-gray-50 rounded-xl">
-                        <h4 className="font-bold mb-2">Order #{order.id}</h4>
-                        <p className="text-sm text-gray-600 mb-1">Customer: {order.name} ({order.email})</p>
-                        <p className="text-sm text-gray-600 mb-1">Date: {order.date}</p>
-                        <p className="text-sm text-gray-600 mb-1">Total: ${order.total}</p>
-                        <p className="text-sm text-gray-600 mb-1">Items:</p>
-                        <ul className="ml-5 text-sm text-gray-600 list-disc">
-                          {order.items.map((item, i) => (
-                            <li key={i}>{item.title} ({item.type}) - ${item.price}</li>
-                          ))}
+        async function addNewBook() {
+            const title = document.getElementById('newBookTitle').value.trim();
+            const ebook = parseFloat(document.getElementById('newBookEbook').value);
+            const physical = parseFloat(document.getElementById('newBookPhysical').value);
+            const rating = parseFloat(document.getElementById('newBookRating').value);
+            const sales = parseInt(document.getElementById('newBookSales').value);
+            const badge = document.getElementById('newBookBadge').value.trim();
+            const popular = document.getElementById('newBookPopular').checked;
+            const preview = document.getElementById('newBookPreview').value.trim();
+            
+            if (!title || !preview) {
+                showNotification('❌ Please fill in title and preview!', 'error');
+                return;
+            }
+            
+            if (isNaN(ebook) || isNaN(physical) || ebook < 0 || physical < 0) {
+                showNotification('❌ Please enter valid prices!', 'error');
+                return;
+            }
+            
+            if (rating < 0 || rating > 5) {
+                showNotification('❌ Rating must be between 0 and 5!', 'error');
+                return;
+            }
+            
+            const newBook = {
+                id: 'book_' + Date.now(),
+                title,
+                ebook,
+                physical,
+                rating,
+                sales,
+                badge: badge || undefined,
+                popular,
+                preview
+            };
+            
+            if (db) {
+                try {
+                    await db.ref('books/' + newBook.id).set(newBook);
+                    showNotification('✅ Book added successfully!', 'success');
+                } catch (error) {
+                    console.error('Error adding book:', error);
+                    showNotification('❌ Failed to add book. Try again.', 'error');
+                    return;
+                }
+            } else {
+                books.push(newBook);
+                saveLocalData();
+                renderBooks();
+                showNotification('✅ Book added successfully!', 'success');
+            }
+            
+            document.getElementById('newBookTitle').value = '';
+            document.getElementById('newBookEbook').value = '5';
+            document.getElementById('newBookPhysical').value = '10';
+            document.getElementById('newBookRating').value = '4.5';
+            document.getElementById('newBookSales').value = '0';
+            document.getElementById('newBookBadge').value = '';
+            document.getElementById('newBookPopular').checked = false;
+            document.getElementById('newBookPreview').value = '';
+        }
+
+        function editBook(index) {
+            const book = books[index];
+            
+            document.getElementById('newBookTitle').value = book.title;
+            document.getElementById('newBookEbook').value = book.ebook;
+            document.getElementById('newBookPhysical').value = book.physical;
+            document.getElementById('newBookRating').value = book.rating;
+            document.getElementById('newBookSales').value = book.sales;
+            document.getElementById('newBookBadge').value = book.badge || '';
+            document.getElementById('newBookPopular').checked = book.popular || false;
+            document.getElementById('newBookPreview').value = book.preview;
+            
+            if (db) {
+                db.ref('books/' + book.id).remove();
+            } else {
+                books.splice(index, 1);
+                saveLocalData();
+            }
+            loadAdminBooks();
+            
+            showAdminTab('add');
+            const addTab = document.querySelectorAll('.admin-tab')[1];
+            addTab.click();
+            
+            showNotification('✏️ Edit mode - Update and click Add Book', 'info');
+        }
+
+        async function deleteBook(index) {
+            const book = books[index];
+            if (!confirm(`Are you sure you want to delete "${book.title}"?`)) return;
+            
+            if (db) {
+                try {
+                    await db.ref('books/' + book.id).remove();
+                    showNotification(`🗑️ "${book.title}" deleted successfully!`, 'success');
+                } catch (error) {
+                    console.error('Error deleting book:', error);
+                    showNotification('❌ Failed to delete book. Try again.', 'error');
+                }
+            } else {
+                books.splice(index, 1);
+                saveLocalData();
+                renderBooks();
+                loadAdminBooks();
+                showNotification(`🗑️ "${book.title}" deleted successfully!`, 'success');
+            }
+        }
+
+        function loadAdminOrders() {
+            const list = document.getElementById('adminOrdersList');
+            
+            if (globalOrders.length === 0) {
+                list.innerHTML = '<p style="color: #999;">No orders yet.</p>';
+                return;
+            }
+            
+            list.innerHTML = globalOrders.slice().reverse().map(order => `
+                <div class="admin-book-item">
+                    <div>
+                        <h4>Order #${order.id}</h4>
+                        <p style="color: #666; margin: 5px 0;">
+                            <strong>Customer:</strong> ${order.name} (${order.email})
+                        </p>
+                        <p style="color: #666; margin: 5px 0;">
+                            <strong>Date:</strong> ${order.date}
+                        </p>
+                        <p style="color: #666; margin: 5px 0;">
+                            <strong>Total:</strong> ${order.total}
+                        </p>
+                        <p style="color: #666; margin: 5px 0;">
+                            <strong>Items:</strong>
+                        </p>
+                        <ul style="margin-left: 20px; color: #666;">
+                            ${order.items.map(item => `<li>${item.title} (${item.type}) - ${item.price}</li>`).join('')}
                         </ul>
-                        {order.notes && <p className="text-sm text-gray-500 italic mt-2">Notes: {order.notes}</p>}
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                <div className="border-t-4 border-purple-600 pt-6 mt-6">
-                  <h3 className="text-xl font-bold text-purple-600 mb-4">📚 Deliver Book Directly</h3>
-                  <p className="text-gray-600 mb-4">Send a book directly to a customer without them placing an order.</p>
-                  
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block font-semibold mb-2">Customer Name:</label>
-                      <input
-                        type="text"
-                        value={deliverForm.customerName}
-                        onChange={(e) => setDeliverForm({...deliverForm, customerName: e.target.value})}
-                        placeholder="e.g., Anne Bell"
-                        className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-purple-500 focus:outline-none"
-                      />
+                        ${order.notes ? `<p style="color: #999; margin: 5px 0; font-style: italic;"><strong>Notes:</strong> ${order.notes}</p>` : ''}
                     </div>
-
-                    <div>
-                      <label className="block font-semibold mb-2">Select Book:</label>
-                      <select
-                        value={deliverForm.bookIndex}
-                        onChange={(e) => setDeliverForm({...deliverForm, bookIndex: e.target.value})}
-                        className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-purple-500 focus:outline-none"
-                      >
-                        <option value="">-- Choose a book --</option>
-                        {books.map((book, index) => (
-                          <option key={book.id} value={index}>{book.title}</option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block font-semibold mb-2">Book Content (Full Text):</label>
-                      <textarea
-                        value={deliverForm.content}
-                        onChange={(e) => setDeliverForm({...deliverForm, content: e.target.value})}
-                        rows={10}
-                        placeholder="Paste the full book content here..."
-                        className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-purple-500 focus:outline-none font-mono text-sm"
-                      />
-                      <small className="text-gray-500">This text will appear when the customer reads the book.</small>
-                    </div>
-
-                    <button
-                      onClick={async () => {
-                        if (!deliverForm.customerName.trim()) {
-                          showNotificationMsg('❌ Please enter a customer name!', 'error');
-                          return;
-                        }
-                        if (deliverForm.bookIndex === '') {
-                          showNotificationMsg('❌ Please select a book!', 'error');
-                          return;
-                        }
-                        if (!deliverForm.content.trim()) {
-                          showNotificationMsg('❌ Please enter the book content!', 'error');
-                          return;
-                        }
-
-                        const book = books[parseInt(deliverForm.bookIndex)];
-                        const delivered: DeliveredBook = {
-                          id: Date.now(),
-                          customerName: deliverForm.customerName,
-                          bookTitle: book.title,
-                          bookContent: deliverForm.content,
-                          date: new Date().toLocaleString()
-                        };
-
-                        if (db) {
-                          await set(ref(db, 'deliveredBooks/' + delivered.id), delivered);
-                        } else {
-                          setDeliveredBooks([...deliveredBooks, delivered]);
-                          saveLocalData();
-                        }
-
-                        setDeliverForm({ customerName: '', bookIndex: '', content: '' });
-                        showNotificationMsg(`✅ "${book.title}" delivered to ${delivered.customerName}!`, 'success');
-                      }}
-                      className="w-full py-4 bg-gradient-to-r from-green-400 to-cyan-400 text-white rounded-xl font-bold hover:shadow-lg transition-all"
-                    >
-                      📤 Send Book to Customer
-                    </button>
-                  </div>
                 </div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+            `).join('');
+        }
 
-      <style>{`
-        @keyframes slideIn {
-          from {
-            transform: translateX(400px);
-            opacity: 0;
-          }
-          to {
-            transform: translateX(0);
-            opacity: 1;
-          }
+        function closeModal(event, id) {
+            if (event.target.id === id) {
+                document.getElementById(id).style.display = 'none';
+            }
         }
-        .animate-slideIn {
-          animation: slideIn 0.3s ease-out;
+
+        function showNotification(msg, type = 'default') {
+            const notif = document.getElementById('notification');
+            notif.textContent = msg;
+            
+            notif.classList.remove('success', 'error', 'info');
+            
+            if (type === 'success') notif.classList.add('success');
+            else if (type === 'error') notif.classList.add('error');
+            else if (type === 'info') notif.classList.add('info');
+            
+            notif.style.display = 'block';
+            setTimeout(() => {
+                notif.style.display = 'none';
+            }, 3500);
         }
-      `}</style>
-    </>
-  );
-}
+
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                closePreview();
+                closeProfile();
+                closeAchievements();
+                closeRewards();
+                closeAdminLogin();
+                closeAdminPanel();
+                closeCheckout();
+                closeBookReader();
+            }
+            
+            if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+                e.preventDefault();
+                document.getElementById('searchBox')?.focus();
+            }
+        });
+
+        window.addEventListener('beforeunload', function(e) {
+            if (state.cart && state.cart.length > 0) {
+                e.preventDefault();
+                e.returnValue = 'You have items in your cart. Are you sure you want to leave?';
+                return e.returnValue;
+            }
+        });
+
+        // Initialize on load
+        window.onload = async function() {
+            await initializeFirebase();
+            
+            // Try to restore session from localStorage
+            const savedUserId = localStorage.getItem('randomParkBooks_currentUser');
+            if (savedUserId) {
+                state.userId = savedUserId;
+                await loadUserData(savedUserId);
+                
+                if (state.name && state.email) {
+                    // Check if session is still valid
+                    const sessionValid = await checkActiveSession(state.firstName, state.lastName);
+                    if (sessionValid) {
+                        document.getElementById('welcomeScreen').style.display = 'none';
+                        document.getElementById('mainApp').style.display = 'block';
+                        document.getElementById('displayName').textContent = state.name;
+                        document.getElementById('userAvatar').textContent = state.avatar;
+                        applyTheme();
+                        renderBooks();
+                        updateDisplay();
+                    } else {
+                        // Session expired, need to login again
+                        localStorage.removeItem('randomParkBooks_currentUser');
+                    }
+                }
+            }
+        };
+
+        // Save current user ID for session restoration
+        window.addEventListener('beforeunload', () => {
+            if (state.userId) {
+                localStorage.setItem('randomParkBooks_currentUser', state.userId);
+            }
+        });
+    </script>
+</body>
+</html>
